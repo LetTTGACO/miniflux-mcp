@@ -190,6 +190,21 @@ func buildEntryFilter(args map[string]interface{}) *client.Filter {
 	return filter
 }
 
+func buildScopedEntryFilter(args map[string]interface{}, routeIDKey string) *client.Filter {
+	filterArgs := make(map[string]interface{}, len(args))
+	for key, value := range args {
+		if key == routeIDKey {
+			continue
+		}
+		filterArgs[key] = value
+	}
+	if len(filterArgs) == 0 {
+		return nil
+	}
+
+	return buildEntryFilter(filterArgs)
+}
+
 func buildFeedModificationRequest(args map[string]interface{}) *client.FeedModificationRequest {
 	request := &client.FeedModificationRequest{}
 
@@ -719,19 +734,7 @@ func (s *MinifluxServer) GetCategoryEntries(ctx context.Context, request mcp.Cal
 	}
 
 	categoryID := int64(categoryIDFloat)
-
-	// Parse optional filter parameters
-	var filter *client.Filter
-	if statusStr, ok := argsMap["status"].(string); ok {
-		filter = &client.Filter{Status: statusStr}
-	}
-	if limitFloat, ok := argsMap["limit"].(float64); ok {
-		if filter == nil {
-			filter = &client.Filter{}
-		}
-		limit := int(limitFloat)
-		filter.Limit = limit
-	}
+	filter := buildScopedEntryFilter(argsMap, "category_id")
 
 	entries, err := s.client.CategoryEntries(categoryID, filter)
 	if err != nil {

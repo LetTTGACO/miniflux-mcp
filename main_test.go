@@ -143,6 +143,109 @@ func TestNewMinifluxServerFromConfigRequiresCredentials(t *testing.T) {
 	}
 }
 
+func TestGetFeedEntriesUsesFullEntryFilter(t *testing.T) {
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != "/v1/feeds/12/entries" {
+						t.Fatalf("path = %s, want /v1/feeds/12/entries", req.URL.Path)
+					}
+					query := req.URL.Query()
+					if query.Get("search") != "rss" {
+						t.Fatalf("search = %q, want rss", query.Get("search"))
+					}
+					if query.Get("starred") != "1" {
+						t.Fatalf("starred = %q, want 1", query.Get("starred"))
+					}
+					if query.Get("published_after") != "1700000000" {
+						t.Fatalf("published_after = %q, want 1700000000", query.Get("published_after"))
+					}
+					if query.Get("order") != "published_at" || query.Get("direction") != "desc" {
+						t.Fatalf("order/direction = %q/%q, want published_at/desc", query.Get("order"), query.Get("direction"))
+					}
+					if query.Get("feed_id") != "" {
+						t.Fatalf("feed_id query = %q, want empty because feed_id is already in path", query.Get("feed_id"))
+					}
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewBufferString(`{"total":0,"entries":[]}`)),
+						Header:     http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+
+	_, err := server.GetFeedEntries(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"feed_id":          float64(12),
+				"search":           "rss",
+				"starred":          true,
+				"published_after":  float64(1700000000),
+				"order":            "published_at",
+				"direction":        "desc",
+				"globally_visible": true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("GetFeedEntries returned error: %v", err)
+	}
+}
+
+func TestGetCategoryEntriesUsesFullEntryFilter(t *testing.T) {
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != "/v1/categories/34/entries" {
+						t.Fatalf("path = %s, want /v1/categories/34/entries", req.URL.Path)
+					}
+					query := req.URL.Query()
+					if query.Get("after_entry_id") != "99" {
+						t.Fatalf("after_entry_id = %q, want 99", query.Get("after_entry_id"))
+					}
+					if query.Get("changed_before") != "1800000000" {
+						t.Fatalf("changed_before = %q, want 1800000000", query.Get("changed_before"))
+					}
+					if got := query["status"]; len(got) != 2 || got[0] != "read" || got[1] != "unread" {
+						t.Fatalf("status query = %#v, want read/unread", got)
+					}
+					if query.Get("category_id") != "" {
+						t.Fatalf("category_id query = %q, want empty because category_id is already in path", query.Get("category_id"))
+					}
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(bytes.NewBufferString(`{"total":0,"entries":[]}`)),
+						Header:     http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+
+	_, err := server.GetCategoryEntries(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: map[string]interface{}{
+				"category_id":      float64(34),
+				"statuses":         []interface{}{"read", "unread"},
+				"after_entry_id":   float64(99),
+				"changed_before":   float64(1800000000),
+				"globally_visible": true,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("GetCategoryEntries returned error: %v", err)
+	}
+}
+
 func TestBuildEntryFilterMapsSupportedArguments(t *testing.T) {
 	filter := buildEntryFilter(map[string]interface{}{
 		"status":           "unread",

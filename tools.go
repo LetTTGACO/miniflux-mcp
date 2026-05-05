@@ -10,6 +10,99 @@ type ToolDefinition struct {
 	Handler server.ToolHandlerFunc
 }
 
+func entryFilterProperties() map[string]interface{} {
+	return map[string]interface{}{
+		"status": map[string]interface{}{
+			"type":        "string",
+			"description": "Filter by entry status (read, unread, removed)",
+		},
+		"statuses": map[string]interface{}{
+			"type":        "array",
+			"description": "Filter by multiple entry statuses",
+			"items": map[string]interface{}{
+				"type": "string",
+			},
+		},
+		"feed_id": map[string]interface{}{
+			"type":        "number",
+			"description": "Filter by specific feed ID",
+		},
+		"category_id": map[string]interface{}{
+			"type":        "number",
+			"description": "Filter by specific category ID",
+		},
+		"limit": map[string]interface{}{
+			"type":        "number",
+			"description": "Limit the number of entries returned",
+		},
+		"offset": map[string]interface{}{
+			"type":        "number",
+			"description": "Offset for pagination",
+		},
+		"order": map[string]interface{}{
+			"type":        "string",
+			"description": "Sort field for entries",
+		},
+		"direction": map[string]interface{}{
+			"type":        "string",
+			"description": "Sort direction (asc or desc)",
+		},
+		"starred": map[string]interface{}{
+			"type":        "boolean",
+			"description": "Filter starred entries",
+		},
+		"before": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries before this Unix timestamp",
+		},
+		"after": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries after this Unix timestamp",
+		},
+		"published_before": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries published before this Unix timestamp",
+		},
+		"published_after": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries published after this Unix timestamp",
+		},
+		"changed_before": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries changed before this Unix timestamp",
+		},
+		"changed_after": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries changed after this Unix timestamp",
+		},
+		"before_entry_id": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries before this entry ID",
+		},
+		"after_entry_id": map[string]interface{}{
+			"type":        "number",
+			"description": "Return entries after this entry ID",
+		},
+		"search": map[string]interface{}{
+			"type":        "string",
+			"description": "Search query",
+		},
+		"globally_visible": map[string]interface{}{
+			"type":        "boolean",
+			"description": "Filter globally visible entries",
+		},
+	}
+}
+
+func entryFilterPropertiesWithRouteID(routeIDKey, description string) map[string]interface{} {
+	properties := entryFilterProperties()
+	properties[routeIDKey] = map[string]interface{}{
+		"type":        "number",
+		"description": description,
+	}
+	return properties
+}
+
 func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 	tools := []ToolDefinition{
 		// Feed Operations
@@ -166,26 +259,9 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				Name:        "get_feed_entries",
 				Description: "Get entries from a specific feed",
 				InputSchema: mcp.ToolInputSchema{
-					Type: "object",
-					Properties: map[string]interface{}{
-						"feed_id": map[string]interface{}{
-							"type":        "number",
-							"description": "The ID of the feed",
-						},
-						"status": map[string]interface{}{
-							"type":        "string",
-							"description": "Filter by entry status (read, unread, removed)",
-						},
-						"limit": map[string]interface{}{
-							"type":        "number",
-							"description": "Limit the number of entries returned",
-						},
-						"offset": map[string]interface{}{
-							"type":        "number",
-							"description": "Offset for pagination",
-						},
-					},
-					Required: []string{"feed_id"},
+					Type:       "object",
+					Properties: entryFilterPropertiesWithRouteID("feed_id", "The ID of the feed"),
+					Required:   []string{"feed_id"},
 				},
 			},
 			Handler: s.GetFeedEntries,
@@ -280,88 +356,8 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				Name:        "get_entries",
 				Description: "Get entries (articles) from Miniflux with optional filtering",
 				InputSchema: mcp.ToolInputSchema{
-					Type: "object",
-					Properties: map[string]interface{}{
-						"status": map[string]interface{}{
-							"type":        "string",
-							"description": "Filter by entry status (read, unread, removed)",
-						},
-						"statuses": map[string]interface{}{
-							"type":        "array",
-							"description": "Filter by multiple entry statuses",
-							"items": map[string]interface{}{
-								"type": "string",
-							},
-						},
-						"feed_id": map[string]interface{}{
-							"type":        "number",
-							"description": "Filter by specific feed ID",
-						},
-						"category_id": map[string]interface{}{
-							"type":        "number",
-							"description": "Filter by specific category ID",
-						},
-						"limit": map[string]interface{}{
-							"type":        "number",
-							"description": "Limit the number of entries returned",
-						},
-						"offset": map[string]interface{}{
-							"type":        "number",
-							"description": "Offset for pagination",
-						},
-						"order": map[string]interface{}{
-							"type":        "string",
-							"description": "Sort field for entries",
-						},
-						"direction": map[string]interface{}{
-							"type":        "string",
-							"description": "Sort direction (asc or desc)",
-						},
-						"starred": map[string]interface{}{
-							"type":        "boolean",
-							"description": "Filter starred entries",
-						},
-						"before": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries before this Unix timestamp",
-						},
-						"after": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries after this Unix timestamp",
-						},
-						"published_before": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries published before this Unix timestamp",
-						},
-						"published_after": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries published after this Unix timestamp",
-						},
-						"changed_before": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries changed before this Unix timestamp",
-						},
-						"changed_after": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries changed after this Unix timestamp",
-						},
-						"before_entry_id": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries before this entry ID",
-						},
-						"after_entry_id": map[string]interface{}{
-							"type":        "number",
-							"description": "Return entries after this entry ID",
-						},
-						"search": map[string]interface{}{
-							"type":        "string",
-							"description": "Search query",
-						},
-						"globally_visible": map[string]interface{}{
-							"type":        "boolean",
-							"description": "Filter globally visible entries",
-						},
-					},
+					Type:       "object",
+					Properties: entryFilterProperties(),
 				},
 			},
 			Handler: s.GetEntries,
@@ -579,22 +575,9 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				Name:        "get_category_entries",
 				Description: "Get all entries in a specific category",
 				InputSchema: mcp.ToolInputSchema{
-					Type: "object",
-					Properties: map[string]interface{}{
-						"category_id": map[string]interface{}{
-							"type":        "number",
-							"description": "The ID of the category",
-						},
-						"status": map[string]interface{}{
-							"type":        "string",
-							"description": "Filter by entry status (read, unread, removed)",
-						},
-						"limit": map[string]interface{}{
-							"type":        "number",
-							"description": "Limit the number of entries returned",
-						},
-					},
-					Required: []string{"category_id"},
+					Type:       "object",
+					Properties: entryFilterPropertiesWithRouteID("category_id", "The ID of the category"),
+					Required:   []string{"category_id"},
 				},
 			},
 			Handler: s.GetCategoryEntries,
