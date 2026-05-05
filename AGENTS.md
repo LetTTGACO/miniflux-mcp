@@ -31,6 +31,14 @@ docker build -t miniflux-mcp:local-check .
 
 Use a more specific Docker tag when it helps describe the change being verified.
 
+## Docker Publishing
+
+- The Docker publish workflow is triggered by `v*` tags.
+- Use Docker Hub access-token authentication, not account passwords.
+- The required GitHub Actions repository secrets are `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
+- Keep the public Docker image name documented in README, and let `.github/workflows/docker.yml` derive the namespace from `DOCKERHUB_USERNAME`.
+- If changing the image namespace or registry, update `.github/workflows/docker.yml` and README in the same change.
+
 ## Documentation Rules
 
 - Keep README tool counts and group counts aligned with `RegisterAllTools` in `tools.go`.
