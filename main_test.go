@@ -375,55 +375,6 @@ func TestGetDailyDigestScrapesOnlyWhenExplicitlyRequestedAndTruncates(t *testing
 	}
 }
 
-func TestGetDailyDigestCanReturnTextContent(t *testing.T) {
-	server := &MinifluxServer{
-		client: client.NewClientWithOptions(
-			"http://mf",
-			client.WithHTTPClient(&http.Client{
-				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-					if req.URL.Path != "/v1/entries" {
-						t.Fatalf("path = %s, want /v1/entries", req.URL.Path)
-					}
-					return &http.Response{
-						StatusCode: http.StatusOK,
-						Body: io.NopCloser(strings.NewReader(`{
-							"total": 1,
-							"entries": [{
-								"id": 42,
-								"title": "Encoded feed",
-								"url": "https://example.com/news",
-								"status": "unread",
-								"content": "<p>A &amp; B<br>Second line</p>",
-								"published_at": "2026-05-05T01:30:00Z"
-							}]
-						}`)),
-						Header: http.Header{},
-					}, nil
-				}),
-			}),
-		),
-	}
-
-	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
-		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
-			"since":          float64(1777910400),
-			"content_format": "text",
-		}},
-	})
-	if err != nil {
-		t.Fatalf("handler returned transport error: %v", err)
-	}
-	if result == nil || result.IsError {
-		t.Fatalf("result = %#v, want non-error", result)
-	}
-
-	var response dailyDigestResponse
-	unmarshalToolResultText(t, result, &response)
-	if response.Entries[0].Content != "A & B Second line" {
-		t.Fatalf("content = %q, want text content", response.Entries[0].Content)
-	}
-}
-
 func TestGetDailyDigestRequiresSince(t *testing.T) {
 	server := &MinifluxServer{}
 

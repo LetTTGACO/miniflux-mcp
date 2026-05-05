@@ -176,7 +176,7 @@ The Miniflux MCP Server provides **51 tools** covering Miniflux API functionalit
 
 ## AI Digest Workflow
 
-Use `get_daily_digest` when an AI client needs bounded Miniflux input for a daily report or similar digest. The caller must pass `since` as a Unix timestamp or RFC3339 timestamp; the caller owns timezone and date-boundary decisions. Content is returned as Miniflux provides it by default; pass `content_format: "text"` to do lightweight HTML tag stripping and entity decoding.
+Use `get_daily_digest` when an AI client needs bounded Miniflux input for a daily report or similar digest. The caller must pass `since` as a Unix timestamp or RFC3339 timestamp; the caller owns timezone and date-boundary decisions.
 
 Recommended flow:
 

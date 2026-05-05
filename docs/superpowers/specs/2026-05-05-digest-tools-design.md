@@ -19,8 +19,6 @@ Add two high-level MCP tools for AI clients: one to fetch Miniflux entries for a
 - `content_mode=scrape_when_short`: use feed content, but call Miniflux original-content scraping when the content is shorter than `min_content_length`.
 - `content_mode=scrape_all`: explicitly scrape original content for every entry.
 
-Content defaults to `content_format=raw`, which returns Miniflux content unchanged. Callers may request `content_format=text` for lightweight HTML tag stripping and entity decoding before truncation.
-
 Returned content is truncated to `max_content_length` per entry. The tool returns content metadata such as `content_source`, `content_available`, and `content_truncated` so the caller can judge whether it is using feed text, scraped text, or missing text.
 
 ## Boundaries
