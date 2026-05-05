@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"miniflux.app/v2/client"
@@ -529,6 +531,29 @@ func (s *MinifluxServer) Export(ctx context.Context, request mcp.CallToolRequest
 	}
 
 	return mcp.NewToolResultText(string(data)), nil
+}
+
+func (s *MinifluxServer) ImportOPML(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("opml_content is required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	opmlContent, ok := argsMap["opml_content"].(string)
+	if !ok || opmlContent == "" {
+		return mcp.NewToolResultError("opml_content must be a non-empty string"), nil
+	}
+
+	if err := s.client.ImportContext(ctx, io.NopCloser(strings.NewReader(opmlContent))); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to import OPML: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText("OPML imported successfully"), nil
 }
 
 func (s *MinifluxServer) FlushHistory(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
