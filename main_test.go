@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
@@ -428,6 +429,564 @@ func assertToolErrorContains(t *testing.T, result *mcp.CallToolResult, want stri
 	}
 	if !strings.Contains(textContent.Text, want) {
 		t.Fatalf("error text = %q, want to contain %q", textContent.Text, want)
+	}
+}
+
+func TestCategoryHandlersSendExpectedRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      func(*MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		args         map[string]interface{}
+		wantMethod   string
+		wantPath     string
+		wantJSONBody map[string]interface{}
+		responseCode int
+		responseBody string
+	}{
+		{
+			name: "create category",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.CreateCategory
+			},
+			args:         map[string]interface{}{"title": "Reading"},
+			wantMethod:   http.MethodPost,
+			wantPath:     "/v1/categories",
+			wantJSONBody: map[string]interface{}{"title": "Reading", "hide_globally": false},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":7,"title":"Reading"}`,
+		},
+		{
+			name: "update category",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateCategory
+			},
+			args:         map[string]interface{}{"category_id": float64(7), "title": "Updated"},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/categories/7",
+			wantJSONBody: map[string]interface{}{"title": "Updated", "hide_globally": nil},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":7,"title":"Updated"}`,
+		},
+		{
+			name: "delete category",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.DeleteCategory
+			},
+			args:         map[string]interface{}{"category_id": float64(7)},
+			wantMethod:   http.MethodDelete,
+			wantPath:     "/v1/categories/7",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "mark category as read",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.MarkCategoryAsRead
+			},
+			args:         map[string]interface{}{"category_id": float64(7)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/categories/7/mark-all-as-read",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "refresh category",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.RefreshCategory
+			},
+			args:         map[string]interface{}{"category_id": float64(7)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/categories/7/refresh",
+			responseCode: http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newHTTPAssertionServer(t, tt.wantMethod, tt.wantPath, tt.wantJSONBody, tt.responseCode, tt.responseBody)
+			result, err := tt.handler(server)(context.Background(), mcp.CallToolRequest{
+				Params: mcp.CallToolParams{Arguments: tt.args},
+			})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			if result == nil || result.IsError {
+				t.Fatalf("result = %#v, want non-error", result)
+			}
+		})
+	}
+}
+
+func TestUserAndAPIKeyHandlersSendExpectedRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      func(*MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		args         map[string]interface{}
+		wantMethod   string
+		wantPath     string
+		wantJSONBody map[string]interface{}
+		responseCode int
+		responseBody string
+	}{
+		{
+			name: "create user",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.CreateUser
+			},
+			args:       map[string]interface{}{"username": "alice", "password": "secret", "is_admin": true},
+			wantMethod: http.MethodPost,
+			wantPath:   "/v1/users",
+			wantJSONBody: map[string]interface{}{
+				"username":          "alice",
+				"password":          "secret",
+				"is_admin":          true,
+				"google_id":         "",
+				"openid_connect_id": "",
+			},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":3,"username":"alice","is_admin":true}`,
+		},
+		{
+			name: "delete user",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.DeleteUser
+			},
+			args:         map[string]interface{}{"user_id": float64(3)},
+			wantMethod:   http.MethodDelete,
+			wantPath:     "/v1/users/3",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "create api key",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.CreateAPIKey
+			},
+			args:         map[string]interface{}{"description": "MCP"},
+			wantMethod:   http.MethodPost,
+			wantPath:     "/v1/api-keys",
+			wantJSONBody: map[string]interface{}{"description": "MCP"},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":9,"description":"MCP","token":"token"}`,
+		},
+		{
+			name: "delete api key",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.DeleteAPIKey
+			},
+			args:         map[string]interface{}{"api_key_id": float64(9)},
+			wantMethod:   http.MethodDelete,
+			wantPath:     "/v1/api-keys/9",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "mark all as read",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.MarkAllAsRead
+			},
+			args:         map[string]interface{}{"user_id": float64(3)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/users/3/mark-all-as-read",
+			responseCode: http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newHTTPAssertionServer(t, tt.wantMethod, tt.wantPath, tt.wantJSONBody, tt.responseCode, tt.responseBody)
+			result, err := tt.handler(server)(context.Background(), mcp.CallToolRequest{
+				Params: mcp.CallToolParams{Arguments: tt.args},
+			})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			if result == nil || result.IsError {
+				t.Fatalf("result = %#v, want non-error", result)
+			}
+		})
+	}
+}
+
+func TestEntryAndEnclosureMutationHandlersSendExpectedRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      func(*MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		args         map[string]interface{}
+		wantMethod   string
+		wantPath     string
+		wantJSONBody map[string]interface{}
+		responseCode int
+		responseBody string
+	}{
+		{
+			name: "update entry status",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateEntryStatus
+			},
+			args:         map[string]interface{}{"entry_id": float64(42), "status": "read"},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/entries",
+			wantJSONBody: map[string]interface{}{"entry_ids": []interface{}{float64(42)}, "status": "read"},
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "toggle starred",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.ToggleStarred
+			},
+			args:         map[string]interface{}{"entry_id": float64(42)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/entries/42/star",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "save entry",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.SaveEntry
+			},
+			args:         map[string]interface{}{"entry_id": float64(42)},
+			wantMethod:   http.MethodPost,
+			wantPath:     "/v1/entries/42/save",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "update entry",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateEntry
+			},
+			args:         map[string]interface{}{"entry_id": float64(42), "title": "New", "content": "Body"},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/entries/42",
+			wantJSONBody: map[string]interface{}{"title": "New", "content": "Body"},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":42,"title":"New","content":"Body"}`,
+		},
+		{
+			name: "update enclosure",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateEnclosure
+			},
+			args:         map[string]interface{}{"enclosure_id": float64(99), "media_progression": float64(120)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/enclosures/99",
+			wantJSONBody: map[string]interface{}{"media_progression": float64(120)},
+			responseCode: http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newHTTPAssertionServer(t, tt.wantMethod, tt.wantPath, tt.wantJSONBody, tt.responseCode, tt.responseBody)
+			result, err := tt.handler(server)(context.Background(), mcp.CallToolRequest{
+				Params: mcp.CallToolParams{Arguments: tt.args},
+			})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			if result == nil || result.IsError {
+				t.Fatalf("result = %#v, want non-error", result)
+			}
+		})
+	}
+}
+
+func TestFeedMutationHandlersSendExpectedRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      func(*MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		args         map[string]interface{}
+		wantMethod   string
+		wantPath     string
+		wantJSONBody map[string]interface{}
+		responseCode int
+		responseBody string
+	}{
+		{
+			name: "create feed",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.CreateFeed
+			},
+			args: map[string]interface{}{
+				"feed_url":      "https://example.com/feed.xml",
+				"category_id":   float64(7),
+				"crawler":       true,
+				"hide_globally": true,
+				"proxy_url":     "socks5://localhost:1080",
+			},
+			wantMethod: http.MethodPost,
+			wantPath:   "/v1/feeds",
+			wantJSONBody: map[string]interface{}{
+				"feed_url":      "https://example.com/feed.xml",
+				"category_id":   float64(7),
+				"crawler":       true,
+				"hide_globally": true,
+				"proxy_url":     "socks5://localhost:1080",
+			},
+			responseCode: http.StatusOK,
+			responseBody: `{"feed_id":12}`,
+		},
+		{
+			name: "update feed",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateFeed
+			},
+			args: map[string]interface{}{
+				"feed_id":       float64(12),
+				"title":         "Updated",
+				"category_id":   float64(7),
+				"hide_globally": false,
+			},
+			wantMethod: http.MethodPut,
+			wantPath:   "/v1/feeds/12",
+			wantJSONBody: map[string]interface{}{
+				"title":         "Updated",
+				"category_id":   float64(7),
+				"hide_globally": false,
+			},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":12,"title":"Updated"}`,
+		},
+		{
+			name: "import feed entry",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.ImportFeedEntry
+			},
+			args: map[string]interface{}{
+				"feed_id":      float64(12),
+				"url":          "https://example.com/article",
+				"title":        "Article",
+				"published_at": float64(1736200000),
+				"starred":      true,
+				"tags":         []interface{}{"go", "rss"},
+			},
+			wantMethod: http.MethodPost,
+			wantPath:   "/v1/feeds/12/entries/import",
+			wantJSONBody: map[string]interface{}{
+				"url":          "https://example.com/article",
+				"title":        "Article",
+				"published_at": float64(1736200000),
+				"starred":      true,
+				"tags":         []interface{}{"go", "rss"},
+			},
+			responseCode: http.StatusOK,
+			responseBody: `{"id":42}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newHTTPBodySubsetAssertionServer(t, tt.wantMethod, tt.wantPath, tt.wantJSONBody, tt.responseCode, tt.responseBody)
+			result, err := tt.handler(server)(context.Background(), mcp.CallToolRequest{
+				Params: mcp.CallToolParams{Arguments: tt.args},
+			})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			if result == nil || result.IsError {
+				t.Fatalf("result = %#v, want non-error", result)
+			}
+		})
+	}
+}
+
+func TestFeedCommandHandlersSendExpectedRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		handler      func(*MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		args         map[string]interface{}
+		wantMethod   string
+		wantPath     string
+		responseCode int
+	}{
+		{
+			name: "delete feed",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.DeleteFeed
+			},
+			args:         map[string]interface{}{"feed_id": float64(12)},
+			wantMethod:   http.MethodDelete,
+			wantPath:     "/v1/feeds/12",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "refresh feed",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.RefreshFeed
+			},
+			args:         map[string]interface{}{"feed_id": float64(12)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/feeds/12/refresh",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "refresh all feeds",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.RefreshAllFeeds
+			},
+			args:         nil,
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/feeds/refresh",
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "mark feed as read",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.MarkFeedAsRead
+			},
+			args:         map[string]interface{}{"feed_id": float64(12)},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/feeds/12/mark-all-as-read",
+			responseCode: http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newHTTPAssertionServer(t, tt.wantMethod, tt.wantPath, nil, tt.responseCode, "")
+			result, err := tt.handler(server)(context.Background(), mcp.CallToolRequest{
+				Params: mcp.CallToolParams{Arguments: tt.args},
+			})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			if result == nil || result.IsError {
+				t.Fatalf("result = %#v, want non-error", result)
+			}
+		})
+	}
+}
+
+func newHTTPAssertionServer(t *testing.T, wantMethod, wantPath string, wantJSONBody map[string]interface{}, responseCode int, responseBody string) *MinifluxServer {
+	t.Helper()
+	return newHTTPAssertionServerWithBodyCheck(t, wantMethod, wantPath, responseCode, responseBody, func(req *http.Request) {
+		assertJSONBody(t, req, wantJSONBody)
+	})
+}
+
+func newHTTPBodySubsetAssertionServer(t *testing.T, wantMethod, wantPath string, wantJSONBodySubset map[string]interface{}, responseCode int, responseBody string) *MinifluxServer {
+	t.Helper()
+	return newHTTPAssertionServerWithBodyCheck(t, wantMethod, wantPath, responseCode, responseBody, func(req *http.Request) {
+		assertJSONBodyContains(t, req, wantJSONBodySubset)
+	})
+}
+
+func newHTTPAssertionServerWithBodyCheck(t *testing.T, wantMethod, wantPath string, responseCode int, responseBody string, checkBody func(*http.Request)) *MinifluxServer {
+	t.Helper()
+
+	return &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if req.Method != wantMethod {
+						t.Fatalf("method = %s, want %s", req.Method, wantMethod)
+					}
+					if req.URL.Path != wantPath {
+						t.Fatalf("path = %s, want %s", req.URL.Path, wantPath)
+					}
+					checkBody(req)
+
+					return &http.Response{
+						StatusCode: responseCode,
+						Body:       io.NopCloser(bytes.NewBufferString(responseBody)),
+						Header:     http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+}
+
+func assertJSONBodyContains(t *testing.T, req *http.Request, wantSubset map[string]interface{}) {
+	t.Helper()
+
+	if req.Body == nil {
+		t.Fatalf("body is nil, want JSON body containing %#v", wantSubset)
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("failed to read request body: %v", err)
+	}
+	var got map[string]interface{}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("failed to decode JSON body %q: %v", body, err)
+	}
+	for key, wantValue := range wantSubset {
+		gotValue, ok := got[key]
+		if !ok {
+			t.Fatalf("body = %#v, want key %q", got, key)
+		}
+		if !jsonValuesEqual(gotValue, wantValue) {
+			t.Fatalf("body[%q] = %#v, want %#v; full body = %#v", key, gotValue, wantValue, got)
+		}
+	}
+}
+
+func assertJSONBody(t *testing.T, req *http.Request, want map[string]interface{}) {
+	t.Helper()
+
+	if want == nil {
+		if req.Body == nil {
+			return
+		}
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
+		}
+		if len(body) != 0 {
+			t.Fatalf("body = %s, want empty body", body)
+		}
+		return
+	}
+	if req.Body == nil {
+		t.Fatalf("body is nil, want JSON body %#v", want)
+	}
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatalf("failed to read request body: %v", err)
+	}
+	var got map[string]interface{}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("failed to decode JSON body %q: %v", body, err)
+	}
+	if !jsonMapsEqual(got, want) {
+		t.Fatalf("body = %#v, want %#v", got, want)
+	}
+}
+
+func jsonMapsEqual(got, want map[string]interface{}) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for key, wantValue := range want {
+		gotValue, ok := got[key]
+		if !ok {
+			return false
+		}
+		if !jsonValuesEqual(gotValue, wantValue) {
+			return false
+		}
+	}
+	return true
+}
+
+func jsonValuesEqual(got, want interface{}) bool {
+	switch wantValue := want.(type) {
+	case []interface{}:
+		gotValues, ok := got.([]interface{})
+		if !ok || len(gotValues) != len(wantValue) {
+			return false
+		}
+		for i := range wantValue {
+			if !jsonValuesEqual(gotValues[i], wantValue[i]) {
+				return false
+			}
+		}
+		return true
+	case nil:
+		return got == nil
+	case float64:
+		gotFloat, ok := got.(float64)
+		return ok && gotFloat == wantValue
+	default:
+		return got == wantValue
 	}
 }
 
