@@ -48,7 +48,7 @@ docker run --env-file .env miniflux-mcp
 ```bash
 # Setup .env file
 # Run
-docker run -i --rm --env-file .env jwonder/miniflux-mcp:latest
+docker run -i --rm --env-file .env letttgaco/miniflux-mcp:latest
 ```
 
 ### Docker Hub Release Workflow
@@ -62,7 +62,7 @@ Configure these repository secrets before publishing:
 | `DOCKERHUB_USERNAME` | Docker Hub username used for the image namespace |
 | `DOCKERHUB_TOKEN` | Docker Hub access token used to push the image |
 
-The published image name is `<DOCKERHUB_USERNAME>/miniflux-mcp`.
+The published image name is `letttgaco/miniflux-mcp`.
 
 ### Local Integration Smoke Test
 
@@ -91,7 +91,7 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
         "MINIFLUX_URL",
         "-e",
         "MINIFLUX_API_KEY",
-        "jwonder/miniflux-mcp:latest"
+        "letttgaco/miniflux-mcp:latest"
       ],
       "env": {
         "MINIFLUX_URL": "https://your-miniflux-instance.com",
