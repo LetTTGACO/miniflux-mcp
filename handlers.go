@@ -11,7 +11,9 @@ import (
 	"miniflux.app/v2/client"
 )
 
-// Feed Management Methods (Additional)
+// Feed handlers are intentionally thin: they validate MCP JSON arguments, call
+// the pinned Miniflux Go client, and return JSON text that MCP clients can pass
+// through without learning Miniflux's internal Go structs.
 func (s *MinifluxServer) GetFeed(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
@@ -257,7 +259,9 @@ func (s *MinifluxServer) RefreshAllFeeds(ctx context.Context, request mcp.CallTo
 	return mcp.NewToolResultText("All feeds refreshed successfully"), nil
 }
 
-// Entry Management Methods (Additional)
+// Entry handlers follow the same adapter pattern as feed handlers. Shared filter
+// and request-shaping helpers live in main.go so schema, handler, and tests stay
+// aligned when Miniflux adds or changes entry fields.
 func (s *MinifluxServer) GetCategoryEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
@@ -424,7 +428,9 @@ func (s *MinifluxServer) MarkAllAsRead(ctx context.Context, request mcp.CallTool
 	return mcp.NewToolResultText(fmt.Sprintf("All entries marked as read for user %d", userID)), nil
 }
 
-// System and Utility Methods
+// System and utility handlers expose Miniflux maintenance endpoints as simple
+// MCP commands, preserving Miniflux errors as tool-result errors instead of Go
+// transport errors.
 func (s *MinifluxServer) GetVersion(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	version, err := s.client.Version()
 	if err != nil {
@@ -546,7 +552,8 @@ func (s *MinifluxServer) FlushHistory(ctx context.Context, request mcp.CallToolR
 	return mcp.NewToolResultText("History flushed successfully"), nil
 }
 
-// API Key Management Methods
+// API key handlers can return newly-created tokens. Keep logs, tests, and docs
+// careful not to introduce real credentials or account secrets.
 func (s *MinifluxServer) GetAPIKeys(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	apiKeys, err := s.client.APIKeys()
 	if err != nil {

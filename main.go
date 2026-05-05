@@ -21,6 +21,9 @@ type MinifluxServer struct {
 
 const minifluxStartupTimeout = 10 * time.Second
 
+// dailyDigestResponse is shaped for downstream summarizers: it includes a stable
+// acknowledgement list plus enough entry metadata to let an agent cite or mark
+// the fetched items after it has processed the digest.
 type dailyDigestResponse struct {
 	GeneratedAt time.Time          `json:"generated_at"`
 	Since       int64              `json:"since"`
@@ -55,6 +58,8 @@ type dailyDigestEntry struct {
 	ContentError     string    `json:"content_error,omitempty"`
 }
 
+// NewMinifluxServer builds the production server from environment variables and
+// fails fast when Miniflux is unreachable or credentials are invalid.
 func NewMinifluxServer() *MinifluxServer {
 	baseURL := os.Getenv("MINIFLUX_URL")
 	apiKey := os.Getenv("MINIFLUX_API_KEY")
@@ -69,6 +74,8 @@ func NewMinifluxServer() *MinifluxServer {
 	return server
 }
 
+// newMinifluxServerFromConfig exists so tests can inject timeouts and HTTP
+// transports while production still reads configuration from the environment.
 func newMinifluxServerFromConfig(baseURL, apiKey, username, password string, startupTimeout time.Duration, httpClient *http.Client) (*MinifluxServer, error) {
 	if baseURL == "" {
 		return nil, fmt.Errorf("MINIFLUX_URL environment variable is required")
@@ -111,6 +118,9 @@ func newMinifluxServerFromConfig(baseURL, apiKey, username, password string, sta
 	}, nil
 }
 
+// GetFeeds returns the Go client's raw feed response as formatted JSON because
+// MCP clients can consume text results directly and Miniflux already owns the
+// response shape.
 func (s *MinifluxServer) GetFeeds(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	feeds, err := s.client.Feeds()
 	if err != nil {
@@ -128,7 +138,6 @@ func (s *MinifluxServer) GetFeeds(ctx context.Context, request mcp.CallToolReque
 func (s *MinifluxServer) GetEntries(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 
-	// Parse optional parameters
 	var filter *client.Filter
 	if args != nil {
 		argsMap, ok := args.(map[string]interface{})
@@ -150,6 +159,8 @@ func (s *MinifluxServer) GetEntries(ctx context.Context, request mcp.CallToolReq
 	return mcp.NewToolResultText(string(entriesJSON)), nil
 }
 
+// buildEntryFilter translates MCP JSON arguments into the Miniflux client's
+// filter struct. Numeric JSON values arrive as float64 through mcp-go.
 func buildEntryFilter(args map[string]interface{}) *client.Filter {
 	filter := &client.Filter{}
 
@@ -225,6 +236,9 @@ func buildEntryFilter(args map[string]interface{}) *client.Filter {
 	return filter
 }
 
+// GetDailyDigest builds a bounded, summarizer-friendly entry list. Unlike
+// get_entries, it requires the caller to provide the time window explicitly so
+// scheduled agents do not accidentally reprocess an unbounded backlog.
 func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	argsMap := map[string]interface{}{}
 	if request.Params.Arguments != nil {
@@ -353,6 +367,9 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	return options, nil
 }
 
+// buildDailyDigestEntry flattens Miniflux's nested entry/feed/category structs
+// into one JSON object per entry so downstream agents do not need Miniflux-
+// specific traversal logic.
 func (s *MinifluxServer) buildDailyDigestEntry(entry *client.Entry, options dailyDigestOptions) dailyDigestEntry {
 	digestEntry := dailyDigestEntry{
 		ID:          entry.ID,
@@ -414,6 +431,8 @@ func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDi
 	}
 }
 
+// truncateContent caps content by bytes rather than runes because the tool is
+// mainly guarding model/context payload size, not rendering display text.
 func truncateContent(content string, maxLength int) (string, bool) {
 	content = strings.TrimSpace(content)
 	if maxLength <= 0 || len(content) <= maxLength {
@@ -427,6 +446,8 @@ func numberArg(args map[string]interface{}, key string) (float64, bool) {
 	return value, ok
 }
 
+// buildScopedEntryFilter removes the path-scoped ID before passing the remaining
+// arguments to Miniflux, preventing duplicate feed_id/category_id query params.
 func buildScopedEntryFilter(args map[string]interface{}, routeIDKey string) *client.Filter {
 	filterArgs := make(map[string]interface{}, len(args))
 	for key, value := range args {
@@ -442,6 +463,8 @@ func buildScopedEntryFilter(args map[string]interface{}, routeIDKey string) *cli
 	return buildEntryFilter(filterArgs)
 }
 
+// buildFeedModificationRequest uses pointer fields so Miniflux can distinguish
+// omitted values from explicit zero values during partial updates.
 func buildFeedModificationRequest(args map[string]interface{}) *client.FeedModificationRequest {
 	request := &client.FeedModificationRequest{}
 
@@ -473,6 +496,8 @@ func buildFeedModificationRequest(args map[string]interface{}) *client.FeedModif
 	return request
 }
 
+// buildFeedCreationRequest fills Miniflux creation defaults and maps only the
+// optional fields the MCP schema exposes.
 func buildFeedCreationRequest(args map[string]interface{}) *client.FeedCreationRequest {
 	request := &client.FeedCreationRequest{CategoryID: 1}
 

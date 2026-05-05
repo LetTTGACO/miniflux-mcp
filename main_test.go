@@ -84,6 +84,38 @@ func TestToolDefinitionsStayInSyncWithREADME(t *testing.T) {
 	}
 }
 
+func TestToolDefinitionsExposeAgentFacingDescriptions(t *testing.T) {
+	for _, toolDef := range minifluxToolDefinitions(&MinifluxServer{}) {
+		if strings.TrimSpace(toolDef.Tool.Description) == "" {
+			t.Fatalf("tool %q has no description", toolDef.Tool.Name)
+		}
+		for propertyName, propertySchema := range toolDef.Tool.InputSchema.Properties {
+			assertSchemaDescription(t, toolDef.Tool.Name, propertyName, propertySchema)
+		}
+	}
+}
+
+func assertSchemaDescription(t *testing.T, toolName, propertyPath string, schema interface{}) {
+	t.Helper()
+
+	schemaMap, ok := schema.(map[string]interface{})
+	if !ok {
+		t.Fatalf("%s.%s schema = %#v, want object schema", toolName, propertyPath, schema)
+	}
+	if description, ok := schemaMap["description"].(string); !ok || strings.TrimSpace(description) == "" {
+		t.Fatalf("%s.%s has no agent-facing description", toolName, propertyPath)
+	}
+	if items, ok := schemaMap["items"]; ok {
+		itemMap, ok := items.(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s.%s.items schema = %#v, want object schema", toolName, propertyPath, items)
+		}
+		if _, hasProperties := itemMap["properties"]; hasProperties {
+			assertSchemaDescription(t, toolName, propertyPath+".items", items)
+		}
+	}
+}
+
 type readmeGroupCount struct {
 	declared int
 	actual   int
