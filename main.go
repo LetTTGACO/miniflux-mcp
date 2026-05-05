@@ -77,26 +77,7 @@ func (s *MinifluxServer) GetEntries(ctx context.Context, request mcp.CallToolReq
 	if args != nil {
 		argsMap, ok := args.(map[string]interface{})
 		if ok {
-			filter = &client.Filter{}
-
-			if statusStr, ok := argsMap["status"].(string); ok {
-				filter.Status = statusStr
-			}
-
-			if feedIDFloat, ok := argsMap["feed_id"].(float64); ok {
-				feedID := int64(feedIDFloat)
-				filter.FeedID = feedID
-			}
-
-			if limitFloat, ok := argsMap["limit"].(float64); ok {
-				limit := int(limitFloat)
-				filter.Limit = limit
-			}
-
-			if offsetFloat, ok := argsMap["offset"].(float64); ok {
-				offset := int(offsetFloat)
-				filter.Offset = offset
-			}
+			filter = buildEntryFilter(argsMap)
 		}
 	}
 
@@ -111,6 +92,81 @@ func (s *MinifluxServer) GetEntries(ctx context.Context, request mcp.CallToolReq
 	}
 
 	return mcp.NewToolResultText(string(entriesJSON)), nil
+}
+
+func buildEntryFilter(args map[string]interface{}) *client.Filter {
+	filter := &client.Filter{}
+
+	if statusStr, ok := args["status"].(string); ok {
+		filter.Status = statusStr
+	}
+	if statuses, ok := args["statuses"].([]interface{}); ok {
+		for _, status := range statuses {
+			if statusStr, ok := status.(string); ok {
+				filter.Statuses = append(filter.Statuses, statusStr)
+			}
+		}
+	}
+	if feedIDFloat, ok := args["feed_id"].(float64); ok {
+		filter.FeedID = int64(feedIDFloat)
+	}
+	if categoryIDFloat, ok := args["category_id"].(float64); ok {
+		filter.CategoryID = int64(categoryIDFloat)
+	}
+	if limitFloat, ok := args["limit"].(float64); ok {
+		filter.Limit = int(limitFloat)
+	}
+	if offsetFloat, ok := args["offset"].(float64); ok {
+		filter.Offset = int(offsetFloat)
+	}
+	if order, ok := args["order"].(string); ok {
+		filter.Order = order
+	}
+	if direction, ok := args["direction"].(string); ok {
+		filter.Direction = direction
+	}
+	if starred, ok := args["starred"].(bool); ok {
+		if starred {
+			filter.Starred = client.FilterOnlyStarred
+		} else {
+			filter.Starred = client.FilterNotStarred
+		}
+	}
+	if starred, ok := args["starred"].(string); ok {
+		filter.Starred = starred
+	}
+	if before, ok := args["before"].(float64); ok {
+		filter.Before = int64(before)
+	}
+	if after, ok := args["after"].(float64); ok {
+		filter.After = int64(after)
+	}
+	if publishedBefore, ok := args["published_before"].(float64); ok {
+		filter.PublishedBefore = int64(publishedBefore)
+	}
+	if publishedAfter, ok := args["published_after"].(float64); ok {
+		filter.PublishedAfter = int64(publishedAfter)
+	}
+	if changedBefore, ok := args["changed_before"].(float64); ok {
+		filter.ChangedBefore = int64(changedBefore)
+	}
+	if changedAfter, ok := args["changed_after"].(float64); ok {
+		filter.ChangedAfter = int64(changedAfter)
+	}
+	if beforeEntryID, ok := args["before_entry_id"].(float64); ok {
+		filter.BeforeEntryID = int64(beforeEntryID)
+	}
+	if afterEntryID, ok := args["after_entry_id"].(float64); ok {
+		filter.AfterEntryID = int64(afterEntryID)
+	}
+	if search, ok := args["search"].(string); ok {
+		filter.Search = search
+	}
+	if globallyVisible, ok := args["globally_visible"].(bool); ok {
+		filter.GloballyVisible = globallyVisible
+	}
+
+	return filter
 }
 
 func (s *MinifluxServer) GetEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
