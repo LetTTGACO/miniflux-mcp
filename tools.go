@@ -463,6 +463,11 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 							"description": "Content retrieval mode (none, feed, scrape_when_short, scrape_all; default: feed)",
 							"enum":        []string{"none", "feed", "scrape_when_short", "scrape_all"},
 						},
+						"content_format": map[string]interface{}{
+							"type":        "string",
+							"description": "Content output format (raw or text; default: raw)",
+							"enum":        []string{"raw", "text"},
+						},
 						"min_content_length": map[string]interface{}{
 							"type":        "number",
 							"description": "Minimum feed content length before scraping is attempted (default: 500)",
