@@ -16,6 +16,29 @@ Do not make unrelated behavior changes while doing documentation, metadata, or a
 - For OPML import, keep the MCP input as `opml_content` string. Do not switch it back to reading local file paths.
 - Startup currently fails fast when healthcheck or auth fails. Do not weaken that behavior unless explicitly requested.
 
+## Current MCP Capability Map
+
+`tools.go` is the source of truth for registered MCP tools. The current public surface is 51 tools across 7 README groups:
+
+- Feed Management: 12 tools for feed CRUD, refresh, feed entry access/import, feed icons, and marking a feed as read.
+- Entry Management: 10 tools for entry listing/filtering, digest retrieval, single and batch status updates, starring, saving, editing, original-content fetch, and marking all entries as read for a user.
+- Category Management: 9 tools for category CRUD, category feeds/entries, refresh, and mark-as-read operations.
+- User Management: 6 tools for listing users, reading the current user, user lookup, user creation, and user deletion.
+- System & Utility: 8 tools for version, healthcheck, counters, integrations, feed discovery, OPML export/import, and history flushing.
+- API Key Management: 3 tools for listing, creating, and deleting API keys.
+- Icons & Media: 3 tools for icons, enclosures, and enclosure media progression.
+
+When updating docs, verify both the total count and every group count against `minifluxToolDefinitions`.
+
+## Digest Tool Boundaries
+
+`get_daily_digest` and `update_entries_status` are high-level tools for AI clients, but this server should stay a Miniflux MCP server rather than a summarizer or delivery system.
+
+- `get_daily_digest` must require a caller-provided `since` value; the server must not choose a timezone, daily boundary, or schedule.
+- Keep digest content modes limited to Miniflux-backed content retrieval: `none`, `feed`, `scrape_when_short`, and `scrape_all`.
+- Do not add article cleanup, summarization, push delivery, or delivery logs to this server.
+- The digest response should keep acknowledgement metadata such as `ack_entry_ids` so clients can call `update_entries_status` only after their downstream processing succeeds.
+
 ## Testing And Verification
 
 Run focused tests first when changing a helper or handler, then run the full suite before committing.
@@ -43,6 +66,8 @@ Use a more specific Docker tag when it helps describe the change being verified.
 
 - Keep README tool counts and group counts aligned with `RegisterAllTools` in `tools.go`.
 - If a tool schema changes, update the README description in the same stage.
+- If a tool changes arguments, update any related workflow docs or plan/spec notes under `docs/`.
+- Keep README usage examples credential-free and avoid private Miniflux URLs.
 - Prefer concise docs that help a future human or agent run, verify, and safely modify the project.
 
 ## Git Workflow

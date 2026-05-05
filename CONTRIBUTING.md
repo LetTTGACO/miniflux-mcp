@@ -22,7 +22,7 @@ Then set either `MINIFLUX_API_KEY` or both `MINIFLUX_USERNAME` and `MINIFLUX_PAS
 
 1. Inspect the existing tool schema and handler patterns before editing.
 2. Add or update focused tests for behavior changes.
-3. Keep README tool descriptions and counts in sync with `tools.go`.
+3. Keep README tool descriptions, group counts, and workflow notes in sync with `tools.go`.
 4. Run verification before committing.
 5. Commit one logical change at a time.
 
@@ -70,6 +70,16 @@ When adding Miniflux API coverage:
 - Prefer expanding an existing tool when the API is the same endpoint with additional options.
 - Add a new tool when the client method represents a distinct operation.
 - Keep sensitive inputs such as passwords, cookies, and tokens out of logs and docs examples.
+
+## Documentation Changes
+
+When updating docs for existing MCP functionality:
+
+- Treat `minifluxToolDefinitions` in `tools.go` as the registered tool source of truth.
+- Check README total and group counts whenever tools move, appear, disappear, or change names.
+- Keep `AGENTS.md` aligned with project boundaries that future agents must preserve.
+- Update `docs/superpowers/specs/` or `docs/superpowers/plans/` when implementation status or tool workflow guidance changes.
+- For digest tools, keep timezone policy, summarization, content cleanup, and delivery state documented as AI-client responsibilities.
 
 ## Pull Request Checklist
 
