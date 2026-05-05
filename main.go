@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"html"
 	"log"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -23,11 +21,8 @@ type MinifluxServer struct {
 
 const minifluxStartupTimeout = 10 * time.Second
 
-var htmlTagRe = regexp.MustCompile(`<[^>]+>`)
-
 type dailyDigestResponse struct {
 	GeneratedAt time.Time          `json:"generated_at"`
-	Timezone    string             `json:"timezone"`
 	Since       int64              `json:"since"`
 	Status      string             `json:"status"`
 	DateField   string             `json:"date_field"`
@@ -271,7 +266,6 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 
 	response := dailyDigestResponse{
 		GeneratedAt: options.now,
-		Timezone:    options.timezone,
 		Since:       options.since,
 		Status:      options.status,
 		DateField:   options.dateField,
@@ -296,44 +290,25 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 }
 
 type dailyDigestOptions struct {
-	timezone           string
-	now                time.Time
-	since              int64
-	status             string
-	dateField          string
-	limit              int
-	contentMode        string
-	minContentLength   int
-	maxContentLength   int
-	includeContentHTML bool
+	now              time.Time
+	since            int64
+	status           string
+	dateField        string
+	limit            int
+	contentMode      string
+	minContentLength int
+	maxContentLength int
 }
 
 func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, error) {
 	options := dailyDigestOptions{
-		timezone:         "Asia/Shanghai",
 		status:           "unread",
 		dateField:        "published",
 		limit:            50,
-		contentMode:      "scrape_when_short",
+		contentMode:      "feed",
 		minContentLength: 500,
 		maxContentLength: 6000,
-	}
-
-	if timezone, ok := args["timezone"].(string); ok && timezone != "" {
-		options.timezone = timezone
-	}
-	location, err := time.LoadLocation(options.timezone)
-	if err != nil {
-		return options, fmt.Errorf("invalid timezone: %v", err)
-	}
-
-	options.now = time.Now().In(location)
-	if nowString, ok := args["now"].(string); ok && nowString != "" {
-		now, err := time.Parse(time.RFC3339, nowString)
-		if err != nil {
-			return options, fmt.Errorf("now must be an RFC3339 timestamp")
-		}
-		options.now = now.In(location)
+		now:              time.Now(),
 	}
 
 	if since, ok := numberArg(args, "since"); ok {
@@ -345,8 +320,7 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 		}
 		options.since = since.Unix()
 	} else {
-		startOfDay := time.Date(options.now.Year(), options.now.Month(), options.now.Day(), 0, 0, 0, 0, location)
-		options.since = startOfDay.Unix()
+		return options, fmt.Errorf("since is required")
 	}
 
 	if status, ok := args["status"].(string); ok && status != "" {
@@ -374,9 +348,6 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	}
 	if maxContentLength, ok := numberArg(args, "max_content_length"); ok {
 		options.maxContentLength = int(maxContentLength)
-	}
-	if includeContentHTML, ok := args["include_content_html"].(bool); ok {
-		options.includeContentHTML = includeContentHTML
 	}
 
 	return options, nil
@@ -410,9 +381,6 @@ func (s *MinifluxServer) buildDailyDigestEntry(entry *client.Entry, options dail
 	digestEntry.ContentError = contentErr
 	digestEntry.ContentAvailable = strings.TrimSpace(content) != ""
 
-	if !options.includeContentHTML {
-		content = htmlToPlainText(content)
-	}
 	content, truncated := truncateContent(content, options.maxContentLength)
 	digestEntry.Content = content
 	digestEntry.ContentLength = len(content)
@@ -433,7 +401,7 @@ func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDi
 		}
 		return content, "scraped", ""
 	case "scrape_when_short":
-		if len(htmlToPlainText(entry.Content)) >= options.minContentLength {
+		if len(strings.TrimSpace(entry.Content)) >= options.minContentLength {
 			return entry.Content, "feed", ""
 		}
 		content, err := s.client.FetchEntryOriginalContent(entry.ID)
@@ -444,11 +412,6 @@ func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDi
 	default:
 		return entry.Content, "feed", ""
 	}
-}
-
-func htmlToPlainText(content string) string {
-	withoutTags := htmlTagRe.ReplaceAllString(content, " ")
-	return strings.Join(strings.Fields(html.UnescapeString(withoutTags)), " ")
 }
 
 func truncateContent(content string, maxLength int) (string, bool) {

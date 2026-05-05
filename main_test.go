@@ -148,6 +148,7 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"get_feed_icon":          {"feed_id"},
 		"mark_feed_as_read":      {"feed_id"},
 		"get_entry":              {"entry_id"},
+		"get_daily_digest":       {"since"},
 		"update_entry_status":    {"entry_id", "status"},
 		"update_entries_status":  {"entry_ids", "status"},
 		"toggle_starred":         {"entry_id"},
@@ -195,7 +196,6 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"get_feeds",
 		"refresh_all_feeds",
 		"get_entries",
-		"get_daily_digest",
 		"get_categories",
 		"get_users",
 		"get_me",
@@ -217,7 +217,7 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 	}
 }
 
-func TestGetDailyDigestUsesUnreadPublishedTodayDefaults(t *testing.T) {
+func TestGetDailyDigestUsesCallerProvidedSince(t *testing.T) {
 	requests := make([]*http.Request, 0, 1)
 	server := &MinifluxServer{
 		client: client.NewClientWithOptions(
@@ -257,9 +257,8 @@ func TestGetDailyDigestUsesUnreadPublishedTodayDefaults(t *testing.T) {
 
 	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
-			"now":                "2026-05-05T12:00:00+08:00",
-			"content_mode":       "feed",
-			"min_content_length": float64(20),
+			"since":        float64(1777910400),
+			"content_mode": "feed",
 		}},
 	})
 	if err != nil {
@@ -294,15 +293,15 @@ func TestGetDailyDigestUsesUnreadPublishedTodayDefaults(t *testing.T) {
 	if response.Count != 1 || len(response.AckEntryIDs) != 1 || response.AckEntryIDs[0] != 42 {
 		t.Fatalf("response count/ack ids = %d/%#v, want 1/[42]", response.Count, response.AckEntryIDs)
 	}
-	if response.Entries[0].Content != "This is a complete feed story with enough useful text for a summary." {
-		t.Fatalf("content = %q, want plain text feed content", response.Entries[0].Content)
+	if response.Entries[0].Content != "<p>This is a complete feed story with enough useful text for a summary.</p>" {
+		t.Fatalf("content = %q, want feed content as returned by Miniflux", response.Entries[0].Content)
 	}
 	if response.Entries[0].ContentSource != "feed" {
 		t.Fatalf("content_source = %q, want feed", response.Entries[0].ContentSource)
 	}
 }
 
-func TestGetDailyDigestScrapesShortFeedContentAndTruncates(t *testing.T) {
+func TestGetDailyDigestScrapesOnlyWhenExplicitlyRequestedAndTruncates(t *testing.T) {
 	requestPaths := make([]string, 0, 2)
 	server := &MinifluxServer{
 		client: client.NewClientWithOptions(
@@ -344,10 +343,9 @@ func TestGetDailyDigestScrapesShortFeedContentAndTruncates(t *testing.T) {
 
 	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
 		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
-			"now":                "2026-05-05T12:00:00+08:00",
-			"content_mode":       "scrape_when_short",
-			"min_content_length": float64(20),
-			"max_content_length": float64(24),
+			"since":              float64(1777910400),
+			"content_mode":       "scrape_all",
+			"max_content_length": float64(36),
 		}},
 	})
 	if err != nil {
@@ -363,8 +361,8 @@ func TestGetDailyDigestScrapesShortFeedContentAndTruncates(t *testing.T) {
 	var response dailyDigestResponse
 	unmarshalToolResultText(t, result, &response)
 	entry := response.Entries[0]
-	if entry.Content != "Scraped content is much" {
-		t.Fatalf("content = %q, want truncated scraped plain text", entry.Content)
+	if entry.Content != "<article>Scraped content is much lon" {
+		t.Fatalf("content = %q, want truncated scraped content", entry.Content)
 	}
 	if entry.ContentSource != "scraped" {
 		t.Fatalf("content_source = %q, want scraped", entry.ContentSource)
@@ -375,6 +373,18 @@ func TestGetDailyDigestScrapesShortFeedContentAndTruncates(t *testing.T) {
 	if !entry.ContentAvailable {
 		t.Fatalf("content_available = false, want true")
 	}
+}
+
+func TestGetDailyDigestRequiresSince(t *testing.T) {
+	server := &MinifluxServer{}
+
+	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{}},
+	})
+	if err != nil {
+		t.Fatalf("handler returned transport error: %v", err)
+	}
+	assertToolErrorContains(t, result, "since is required")
 }
 
 func TestEntryFilterSchemaMatchesSupportedArguments(t *testing.T) {

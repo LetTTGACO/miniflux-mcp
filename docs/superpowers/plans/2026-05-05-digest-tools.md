@@ -1,10 +1,10 @@
-# Hermes Digest Tools Implementation Plan
+# Digest Tools Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add summary-ready daily digest retrieval and batch entry status updates for Hermes Agent.
+**Goal:** Add digest-window entry retrieval and batch entry status updates for AI clients.
 
-**Architecture:** Follow the existing MCP tool pattern: define schemas in `tools.go`, handlers in `main.go` or `handlers.go`, helper functions near entry filtering, and HTTP-backed behavior tests in `main_test.go`. Keep summarization and push delivery logs outside this MCP server.
+**Architecture:** Follow the existing MCP tool pattern: define schemas in `tools.go`, handlers in `main.go` or `handlers.go`, helper functions near entry filtering, and HTTP-backed behavior tests in `main_test.go`. Keep summarization, timezone policy, and delivery logs outside this MCP server.
 
 **Tech Stack:** Go, `miniflux.app/v2 v2.2.19`, mark3labs MCP Go SDK, standard `go test` HTTP test server.
 
@@ -31,9 +31,9 @@
 - Modify: `main_test.go`
 - Modify: `README.md`
 
-- [ ] Add failing tests for `get_daily_digest` defaults: unread status, `published_after` based on `timezone`, and structured response.
-- [ ] Add failing tests for `content_mode` values, scrape fallback, plain-text content, and truncation metadata.
-- [ ] Add the tool schema with `timezone`, `status`, `date_field`, `since`, `limit`, `content_mode`, `min_content_length`, `max_content_length`, and `include_content_html`.
+- [ ] Add failing tests for `get_daily_digest`: required `since`, unread default status, `published_after` based on caller input, and structured response.
+- [ ] Add failing tests for `content_mode` values, explicit scrape behavior, returned Miniflux content, and truncation metadata.
+- [ ] Add the tool schema with `since`, `status`, `date_field`, `limit`, `content_mode`, `min_content_length`, and `max_content_length`.
 - [ ] Implement digest request building and response shaping.
 - [ ] Run focused tests and commit.
 
@@ -42,6 +42,6 @@
 **Files:**
 - Modify: `README.md`
 
-- [ ] Update README tool counts and document the Hermes workflow.
-- [ ] Run `go test -count=1 ./...`, `go build ./...`, `go vet ./...`, and `docker build -t miniflux-mcp:hermes-check .`.
+- [ ] Update README tool counts and document the generic AI digest workflow.
+- [ ] Run `go test -count=1 ./...`, `go build ./...`, `go vet ./...`, and `docker build -t miniflux-mcp:digest-check .`.
 - [ ] Commit documentation or verification fixes if needed.

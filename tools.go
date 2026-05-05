@@ -429,16 +429,12 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 		{
 			Tool: mcp.Tool{
 				Name:        "get_daily_digest",
-				Description: "Get today's unread entries with summary-ready content for Hermes Agent",
+				Description: "Get entries since a caller-provided timestamp with digest-ready metadata and content",
 				InputSchema: mcp.ToolInputSchema{
 					Type: "object",
 					Properties: map[string]interface{}{
-						"timezone": map[string]interface{}{
-							"type":        "string",
-							"description": "IANA timezone for the daily boundary (default: Asia/Shanghai)",
-						},
 						"since": map[string]interface{}{
-							"description": "Unix timestamp or RFC3339 timestamp to override the default start of day",
+							"description": "Unix timestamp or RFC3339 timestamp for the start of the digest window",
 						},
 						"status": map[string]interface{}{
 							"type":        "string",
@@ -464,22 +460,19 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 						},
 						"content_mode": map[string]interface{}{
 							"type":        "string",
-							"description": "Content retrieval mode (none, feed, scrape_when_short, scrape_all)",
+							"description": "Content retrieval mode (none, feed, scrape_when_short, scrape_all; default: feed)",
 							"enum":        []string{"none", "feed", "scrape_when_short", "scrape_all"},
 						},
 						"min_content_length": map[string]interface{}{
 							"type":        "number",
-							"description": "Minimum plain-text feed content length before scraping is attempted (default: 500)",
+							"description": "Minimum feed content length before scraping is attempted (default: 500)",
 						},
 						"max_content_length": map[string]interface{}{
 							"type":        "number",
-							"description": "Maximum content length per entry after text cleanup (default: 6000)",
-						},
-						"include_content_html": map[string]interface{}{
-							"type":        "boolean",
-							"description": "Return HTML content instead of plain text (default: false)",
+							"description": "Maximum content length per entry (default: 6000)",
 						},
 					},
+					Required: []string{"since"},
 				},
 			},
 			Handler: s.GetDailyDigest,

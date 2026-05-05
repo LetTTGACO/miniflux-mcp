@@ -125,7 +125,7 @@ The Miniflux MCP Server provides **51 tools** covering Miniflux API functionalit
 
 ### Entry Management (10 tools)
 - `get_entries` - Get entries with optional filtering
-- `get_daily_digest` - Get today's unread entries with summary-ready content for Hermes Agent
+- `get_daily_digest` - Get entries since a caller-provided timestamp with digest-ready metadata and content
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
 - `update_entries_status` - Update multiple entry statuses (read/unread/removed) in one request
@@ -174,17 +174,17 @@ The Miniflux MCP Server provides **51 tools** covering Miniflux API functionalit
 - `get_enclosure` - Get an enclosure by ID
 - `update_enclosure` - Update enclosure media progression
 
-## Hermes Agent Daily Digest Workflow
+## AI Digest Workflow
 
-Use `get_daily_digest` when Hermes needs summary-ready news input. By default it fetches unread entries published since the start of today in `Asia/Shanghai`, returns plain-text content, and uses Miniflux original-content scraping when feed content is shorter than `min_content_length`.
+Use `get_daily_digest` when an AI client needs bounded Miniflux input for a daily report or similar digest. The caller must pass `since` as a Unix timestamp or RFC3339 timestamp; the caller owns timezone and date-boundary decisions.
 
 Recommended flow:
 
-1. Hermes calls `get_daily_digest` with defaults or a bounded `limit`.
-2. Hermes summarizes and pushes the returned entries.
-3. After delivery succeeds, Hermes calls `update_entries_status` with `ack_entry_ids` from the digest response and `status: "read"`.
+1. The AI client decides the digest window and calls `get_daily_digest` with `since` and an optional bounded `limit`.
+2. The AI client summarizes, displays, or pushes the returned entries.
+3. After successful delivery or review, the AI client may call `update_entries_status` with `ack_entry_ids` from the digest response and `status: "read"`.
 
-Keep summarization and delivery logs in Hermes. This MCP server only reads Miniflux data, prepares article content, and updates Miniflux entry status.
+Keep summarization, delivery logs, and timezone policy in the AI client. This MCP server only reads Miniflux data, returns entry content, and updates Miniflux entry status.
 
 ## License
 
