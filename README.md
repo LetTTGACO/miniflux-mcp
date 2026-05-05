@@ -174,6 +174,18 @@ The Miniflux MCP Server provides **51 tools** covering Miniflux API functionalit
 - `get_enclosure` - Get an enclosure by ID
 - `update_enclosure` - Update enclosure media progression
 
+## Hermes Agent Daily Digest Workflow
+
+Use `get_daily_digest` when Hermes needs summary-ready news input. By default it fetches unread entries published since the start of today in `Asia/Shanghai`, returns plain-text content, and uses Miniflux original-content scraping when feed content is shorter than `min_content_length`.
+
+Recommended flow:
+
+1. Hermes calls `get_daily_digest` with defaults or a bounded `limit`.
+2. Hermes summarizes and pushes the returned entries.
+3. After delivery succeeds, Hermes calls `update_entries_status` with `ack_entry_ids` from the digest response and `status: "read"`.
+
+Keep summarization and delivery logs in Hermes. This MCP server only reads Miniflux data, prepares article content, and updates Miniflux entry status.
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
