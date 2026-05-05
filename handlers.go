@@ -65,6 +65,63 @@ func (s *MinifluxServer) DeleteFeed(ctx context.Context, request mcp.CallToolReq
 	return mcp.NewToolResultText(fmt.Sprintf("Feed %d deleted successfully", feedID)), nil
 }
 
+func (s *MinifluxServer) UpdateFeed(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("feed_id is required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	feedIDFloat, ok := argsMap["feed_id"].(float64)
+	if !ok {
+		return mcp.NewToolResultError("feed_id must be a number"), nil
+	}
+
+	feedID := int64(feedIDFloat)
+	feed, err := s.client.UpdateFeed(feedID, buildFeedModificationRequest(argsMap))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update feed: %v", err)), nil
+	}
+
+	feedJSON, err := json.MarshalIndent(feed, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal feed: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(feedJSON)), nil
+}
+
+func (s *MinifluxServer) ImportFeedEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("feed_id and url are required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	feedIDFloat, ok := argsMap["feed_id"].(float64)
+	if !ok {
+		return mcp.NewToolResultError("feed_id must be a number"), nil
+	}
+	if _, ok := argsMap["url"].(string); !ok {
+		return mcp.NewToolResultError("url must be a string"), nil
+	}
+
+	entryID, err := s.client.ImportFeedEntry(int64(feedIDFloat), buildImportFeedEntryPayload(argsMap))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to import feed entry: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Imported entry %d", entryID)), nil
+}
+
 func (s *MinifluxServer) GetFeedEntries(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
@@ -305,6 +362,35 @@ func (s *MinifluxServer) SaveEntry(ctx context.Context, request mcp.CallToolRequ
 	return mcp.NewToolResultText(fmt.Sprintf("Entry %d saved successfully", entryID)), nil
 }
 
+func (s *MinifluxServer) UpdateEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("entry_id is required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	entryIDFloat, ok := argsMap["entry_id"].(float64)
+	if !ok {
+		return mcp.NewToolResultError("entry_id must be a number"), nil
+	}
+
+	entry, err := s.client.UpdateEntry(int64(entryIDFloat), buildEntryModificationRequest(argsMap))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update entry: %v", err)), nil
+	}
+
+	entryJSON, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal entry: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(entryJSON)), nil
+}
+
 func (s *MinifluxServer) FetchEntryOriginalContent(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
@@ -391,6 +477,20 @@ func (s *MinifluxServer) FetchCounters(ctx context.Context, request mcp.CallTool
 	}
 
 	return mcp.NewToolResultText(string(countersJSON)), nil
+}
+
+func (s *MinifluxServer) GetIntegrationsStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	enabled, err := s.client.IntegrationsStatus()
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to fetch integrations status: %v", err)), nil
+	}
+
+	statusJSON, err := json.MarshalIndent(map[string]bool{"enabled": enabled}, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal integrations status: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(statusJSON)), nil
 }
 
 func (s *MinifluxServer) Discover(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -569,4 +669,34 @@ func (s *MinifluxServer) GetEnclosure(ctx context.Context, request mcp.CallToolR
 	}
 
 	return mcp.NewToolResultText(string(enclosureJSON)), nil
+}
+
+func (s *MinifluxServer) UpdateEnclosure(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("enclosure_id and media_progression are required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	enclosureIDFloat, ok := argsMap["enclosure_id"].(float64)
+	if !ok {
+		return mcp.NewToolResultError("enclosure_id must be a number"), nil
+	}
+	mediaProgressionFloat, ok := argsMap["media_progression"].(float64)
+	if !ok {
+		return mcp.NewToolResultError("media_progression must be a number"), nil
+	}
+
+	err := s.client.UpdateEnclosure(int64(enclosureIDFloat), &client.EnclosureUpdateRequest{
+		MediaProgression: int64(mediaProgressionFloat),
+	})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update enclosure: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Enclosure %d updated successfully", int64(enclosureIDFloat))), nil
 }
