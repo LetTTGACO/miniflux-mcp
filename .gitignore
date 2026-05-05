@@ -10,6 +10,7 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+coverage.*
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -25,6 +26,8 @@ build/
 
 # Environment files
 .env
+.env.*
+!.env.example
 .env.local
 .env.production
 
@@ -51,6 +54,7 @@ logs/
 # Temporary files
 tmp/
 temp/
+*.tmp
 
 # Docker
 docker-compose.override.yml
