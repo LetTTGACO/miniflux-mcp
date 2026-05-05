@@ -107,7 +107,7 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
 
 ## Available Tools
 
-The Miniflux MCP Server provides **49 tools** covering Miniflux API functionality, which can be found in the [Miniflux API Reference](https://miniflux.app/docs/api.html#go-client).
+The Miniflux MCP Server provides **50 tools** covering Miniflux API functionality, which can be found in the [Miniflux API Reference](https://miniflux.app/docs/api.html#go-client).
 
 ### Feed Management (12 tools)
 - `get_feeds` - Get all RSS/Atom feeds
@@ -123,10 +123,11 @@ The Miniflux MCP Server provides **49 tools** covering Miniflux API functionalit
 - `get_feed_icon` - Get the icon of a specific feed
 - `mark_feed_as_read` - Mark all entries in a feed as read
 
-### Entry Management (8 tools)
+### Entry Management (9 tools)
 - `get_entries` - Get entries with optional filtering
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
+- `update_entries_status` - Update multiple entry statuses (read/unread/removed) in one request
 - `toggle_starred` - Toggle starred status of an entry
 - `update_entry` - Update entry title or content
 - `save_entry` - Save an entry

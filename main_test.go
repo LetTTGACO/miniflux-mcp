@@ -25,8 +25,8 @@ func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 
 func TestToolDefinitionsStayInSyncWithREADME(t *testing.T) {
 	toolDefs := minifluxToolDefinitions(&MinifluxServer{})
-	if len(toolDefs) != 49 {
-		t.Fatalf("registered tools = %d, want 49", len(toolDefs))
+	if len(toolDefs) != 50 {
+		t.Fatalf("registered tools = %d, want 50", len(toolDefs))
 	}
 
 	registeredNames := make(map[string]bool, len(toolDefs))
@@ -149,6 +149,7 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"mark_feed_as_read":      {"feed_id"},
 		"get_entry":              {"entry_id"},
 		"update_entry_status":    {"entry_id", "status"},
+		"update_entries_status":  {"entry_ids", "status"},
 		"toggle_starred":         {"entry_id"},
 		"update_entry":           {"entry_id"},
 		"save_entry":             {"entry_id"},
@@ -624,6 +625,17 @@ func TestEntryAndEnclosureMutationHandlersSendExpectedRequests(t *testing.T) {
 			wantMethod:   http.MethodPut,
 			wantPath:     "/v1/entries",
 			wantJSONBody: map[string]interface{}{"entry_ids": []interface{}{float64(42)}, "status": "read"},
+			responseCode: http.StatusNoContent,
+		},
+		{
+			name: "update entries status",
+			handler: func(s *MinifluxServer) func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+				return s.UpdateEntriesStatus
+			},
+			args:         map[string]interface{}{"entry_ids": []interface{}{float64(42), float64(43)}, "status": "read"},
+			wantMethod:   http.MethodPut,
+			wantPath:     "/v1/entries",
+			wantJSONBody: map[string]interface{}{"entry_ids": []interface{}{float64(42), float64(43)}, "status": "read"},
 			responseCode: http.StatusNoContent,
 		},
 		{

@@ -398,6 +398,47 @@ func (s *MinifluxServer) UpdateEntryStatus(ctx context.Context, request mcp.Call
 	return mcp.NewToolResultText(fmt.Sprintf("Entry %d status updated to: %s", entryID, status)), nil
 }
 
+func (s *MinifluxServer) UpdateEntriesStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := request.Params.Arguments
+	if args == nil {
+		return mcp.NewToolResultError("entry_ids and status are required"), nil
+	}
+
+	argsMap, ok := args.(map[string]interface{})
+	if !ok {
+		return mcp.NewToolResultError("Invalid arguments format"), nil
+	}
+
+	entryIDsArg, ok := argsMap["entry_ids"].([]interface{})
+	if !ok {
+		return mcp.NewToolResultError("entry_ids must be an array"), nil
+	}
+	if len(entryIDsArg) == 0 {
+		return mcp.NewToolResultError("entry_ids must not be empty"), nil
+	}
+
+	entryIDs := make([]int64, 0, len(entryIDsArg))
+	for _, entryIDArg := range entryIDsArg {
+		entryIDFloat, ok := entryIDArg.(float64)
+		if !ok {
+			return mcp.NewToolResultError("entry_ids must contain only numbers"), nil
+		}
+		entryIDs = append(entryIDs, int64(entryIDFloat))
+	}
+
+	status, ok := argsMap["status"].(string)
+	if !ok {
+		return mcp.NewToolResultError("status must be a string"), nil
+	}
+
+	err := s.client.UpdateEntries(entryIDs, status)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update entries status: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("%d entries status updated to: %s", len(entryIDs), status)), nil
+}
+
 func (s *MinifluxServer) CreateFeed(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
