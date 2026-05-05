@@ -320,6 +320,117 @@ func sameStringSet(a, b []string) bool {
 	return true
 }
 
+func TestHandlersRejectMissingRequiredArgumentsBeforeCallingClient(t *testing.T) {
+	server := &MinifluxServer{}
+	tests := []struct {
+		name    string
+		handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+		wantErr string
+	}{
+		{"GetFeed", server.GetFeed, "feed_id is required"},
+		{"DeleteFeed", server.DeleteFeed, "feed_id is required"},
+		{"UpdateFeed", server.UpdateFeed, "feed_id is required"},
+		{"ImportFeedEntry", server.ImportFeedEntry, "feed_id and url are required"},
+		{"GetFeedEntries", server.GetFeedEntries, "feed_id is required"},
+		{"GetFeedEntry", server.GetFeedEntry, "feed_id and entry_id are required"},
+		{"GetFeedIcon", server.GetFeedIcon, "feed_id is required"},
+		{"MarkFeedAsRead", server.MarkFeedAsRead, "feed_id is required"},
+		{"GetEntry", server.GetEntry, "entry_id is required"},
+		{"UpdateEntryStatus", server.UpdateEntryStatus, "entry_id and status are required"},
+		{"CreateFeed", server.CreateFeed, "feed_url is required"},
+		{"RefreshFeed", server.RefreshFeed, "feed_id is required"},
+		{"GetUserByID", server.GetUserByID, "user_id is required"},
+		{"GetUserByUsername", server.GetUserByUsername, "username is required"},
+		{"CreateUser", server.CreateUser, "username and password are required"},
+		{"DeleteUser", server.DeleteUser, "user_id is required"},
+		{"CreateCategory", server.CreateCategory, "title is required"},
+		{"UpdateCategory", server.UpdateCategory, "category_id and title are required"},
+		{"DeleteCategory", server.DeleteCategory, "category_id is required"},
+		{"GetCategoryFeeds", server.GetCategoryFeeds, "category_id is required"},
+		{"GetCategoryEntries", server.GetCategoryEntries, "category_id is required"},
+		{"GetCategoryEntry", server.GetCategoryEntry, "category_id and entry_id are required"},
+		{"MarkCategoryAsRead", server.MarkCategoryAsRead, "category_id is required"},
+		{"RefreshCategory", server.RefreshCategory, "category_id is required"},
+		{"ToggleStarred", server.ToggleStarred, "entry_id is required"},
+		{"SaveEntry", server.SaveEntry, "entry_id is required"},
+		{"UpdateEntry", server.UpdateEntry, "entry_id is required"},
+		{"FetchEntryOriginalContent", server.FetchEntryOriginalContent, "entry_id is required"},
+		{"MarkAllAsRead", server.MarkAllAsRead, "user_id is required"},
+		{"Discover", server.Discover, "url is required"},
+		{"ImportOPML", server.ImportOPML, "opml_content is required"},
+		{"CreateAPIKey", server.CreateAPIKey, "description is required"},
+		{"DeleteAPIKey", server.DeleteAPIKey, "api_key_id is required"},
+		{"GetIcon", server.GetIcon, "icon_id is required"},
+		{"GetEnclosure", server.GetEnclosure, "enclosure_id is required"},
+		{"UpdateEnclosure", server.UpdateEnclosure, "enclosure_id and media_progression are required"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.handler(context.Background(), mcp.CallToolRequest{})
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			assertToolErrorContains(t, result, tt.wantErr)
+		})
+	}
+}
+
+func TestHandlersRejectInvalidArgumentContainers(t *testing.T) {
+	server := &MinifluxServer{}
+	tests := []struct {
+		name    string
+		handler func(context.Context, mcp.CallToolRequest) (*mcp.CallToolResult, error)
+	}{
+		{"GetFeed", server.GetFeed},
+		{"CreateFeed", server.CreateFeed},
+		{"GetEntry", server.GetEntry},
+		{"CreateCategory", server.CreateCategory},
+		{"GetUserByID", server.GetUserByID},
+		{"Discover", server.Discover},
+		{"ImportOPML", server.ImportOPML},
+		{"CreateAPIKey", server.CreateAPIKey},
+		{"GetIcon", server.GetIcon},
+		{"UpdateEnclosure", server.UpdateEnclosure},
+	}
+
+	request := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Arguments: []interface{}{"not", "an", "object"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := tt.handler(context.Background(), request)
+			if err != nil {
+				t.Fatalf("handler returned transport error: %v", err)
+			}
+			assertToolErrorContains(t, result, "Invalid arguments format")
+		})
+	}
+}
+
+func assertToolErrorContains(t *testing.T, result *mcp.CallToolResult, want string) {
+	t.Helper()
+
+	if result == nil {
+		t.Fatalf("result is nil, want MCP tool error containing %q", want)
+	}
+	if !result.IsError {
+		t.Fatalf("result IsError = false, want true; content = %#v", result.Content)
+	}
+	if len(result.Content) == 0 {
+		t.Fatalf("error result has no content")
+	}
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("error content = %#v, want mcp.TextContent", result.Content[0])
+	}
+	if !strings.Contains(textContent.Text, want) {
+		t.Fatalf("error text = %q, want to contain %q", textContent.Text, want)
+	}
+}
+
 func TestImportOPMLPostsProvidedContent(t *testing.T) {
 	opmlContent := `<?xml version="1.0"?><opml version="2.0"><body></body></opml>`
 
