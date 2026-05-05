@@ -51,6 +51,19 @@ docker run --env-file .env miniflux-mcp
 docker run -i --rm --env-file .env jwonder/miniflux-mcp:latest
 ```
 
+### Docker Hub Release Workflow
+
+The Docker publish workflow runs when a `v*` tag is pushed, for example `v1.0.0`.
+
+Configure these repository secrets before publishing:
+
+| Secret | Description |
+|--------|-------------|
+| `DOCKERHUB_USERNAME` | Docker Hub username used for the image namespace |
+| `DOCKERHUB_TOKEN` | Docker Hub access token used to push the image |
+
+The published image name is `<DOCKERHUB_USERNAME>/miniflux-mcp`.
+
 ### Local Integration Smoke Test
 
 To test this MCP server against a disposable local Miniflux instance:
