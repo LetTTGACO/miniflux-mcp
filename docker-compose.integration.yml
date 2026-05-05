@@ -1,0 +1,38 @@
+services:
+  miniflux:
+    image: ${MINIFLUX_IMAGE:-miniflux/miniflux:latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${MINIFLUX_INTEGRATION_PORT:-18080}:8080"
+    environment:
+      DATABASE_URL: postgres://miniflux:miniflux@db/miniflux?sslmode=disable
+      RUN_MIGRATIONS: "1"
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: ${MINIFLUX_INTEGRATION_USERNAME:-admin}
+      ADMIN_PASSWORD: ${MINIFLUX_INTEGRATION_PASSWORD:-miniflux-admin}
+    healthcheck:
+      test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    environment:
+      POSTGRES_USER: miniflux
+      POSTGRES_PASSWORD: miniflux
+      POSTGRES_DB: miniflux
+    volumes:
+      - miniflux-integration-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miniflux -d miniflux"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  miniflux-integration-db:

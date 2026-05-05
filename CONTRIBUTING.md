@@ -39,6 +39,22 @@ docker build -t miniflux-mcp:local-check .
 
 For small documentation-only changes, `go test -count=1 ./...` is usually enough, but Docker verification is preferred before releases or Dockerfile-related edits.
 
+### Local Miniflux Integration Smoke Test
+
+Use the optional integration stack when you want to verify the MCP server against a real Miniflux API:
+
+```bash
+scripts/integration-smoke.sh
+```
+
+The script starts Miniflux and Postgres with `docker-compose.integration.yml`, waits for `/healthcheck`, then runs the MCP server over stdio and calls `healthcheck`, `get_me`, `get_categories`, and `get_feeds`. It removes the integration containers and database volume when it exits.
+
+To keep the local Miniflux stack running for manual testing:
+
+```bash
+KEEP_MINIFLUX=1 scripts/integration-smoke.sh
+```
+
 ## API Coverage Changes
 
 When adding Miniflux API coverage:

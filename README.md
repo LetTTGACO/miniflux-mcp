@@ -51,6 +51,16 @@ docker run --env-file .env miniflux-mcp
 docker run -i --rm --env-file .env jwonder/miniflux-mcp:latest
 ```
 
+### Local Integration Smoke Test
+
+To test this MCP server against a disposable local Miniflux instance:
+
+```bash
+scripts/integration-smoke.sh
+```
+
+This starts Miniflux and Postgres through `docker-compose.integration.yml`, then calls the MCP tools `healthcheck`, `get_me`, `get_categories`, and `get_feeds` over stdio. Set `KEEP_MINIFLUX=1` to leave the local stack running after the smoke test.
+
 ### Integration with Claude Desktop
 
 To use this MCP server with Claude Desktop, add the following to your Claude Desktop configuration:
