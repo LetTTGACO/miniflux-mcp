@@ -25,8 +25,8 @@ func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) 
 
 func TestToolDefinitionsStayInSyncWithREADME(t *testing.T) {
 	toolDefs := minifluxToolDefinitions(&MinifluxServer{})
-	if len(toolDefs) != 50 {
-		t.Fatalf("registered tools = %d, want 50", len(toolDefs))
+	if len(toolDefs) != 51 {
+		t.Fatalf("registered tools = %d, want 51", len(toolDefs))
 	}
 
 	registeredNames := make(map[string]bool, len(toolDefs))
@@ -195,6 +195,7 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"get_feeds",
 		"refresh_all_feeds",
 		"get_entries",
+		"get_daily_digest",
 		"get_categories",
 		"get_users",
 		"get_me",
@@ -213,6 +214,166 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		if len(tool.InputSchema.Required) != 0 {
 			t.Fatalf("%s required = %#v, want none", toolName, tool.InputSchema.Required)
 		}
+	}
+}
+
+func TestGetDailyDigestUsesUnreadPublishedTodayDefaults(t *testing.T) {
+	requests := make([]*http.Request, 0, 1)
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					requests = append(requests, req)
+					if req.Method != http.MethodGet {
+						t.Fatalf("method = %s, want GET", req.Method)
+					}
+					if req.URL.Path != "/v1/entries" {
+						t.Fatalf("path = %s, want /v1/entries", req.URL.Path)
+					}
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"total": 1,
+							"entries": [{
+								"id": 42,
+								"title": "Morning news",
+								"url": "https://example.com/news",
+								"status": "unread",
+								"content": "<p>This is a complete feed story with enough useful text for a summary.</p>",
+								"published_at": "2026-05-05T01:30:00Z",
+								"changed_at": "2026-05-05T01:40:00Z",
+								"feed_id": 7,
+								"feed": {"id": 7, "title": "Example Feed", "category": {"id": 3, "title": "News"}}
+							}]
+						}`)),
+						Header: http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+
+	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
+			"now":                "2026-05-05T12:00:00+08:00",
+			"content_mode":       "feed",
+			"min_content_length": float64(20),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("handler returned transport error: %v", err)
+	}
+	if result == nil || result.IsError {
+		t.Fatalf("result = %#v, want non-error", result)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("requests = %d, want 1", len(requests))
+	}
+
+	query := requests[0].URL.Query()
+	if got := query.Get("status"); got != "unread" {
+		t.Fatalf("status query = %q, want unread", got)
+	}
+	if got := query.Get("published_after"); got != "1777910400" {
+		t.Fatalf("published_after query = %q, want 1777910400", got)
+	}
+	if got := query.Get("order"); got != "published_at" {
+		t.Fatalf("order query = %q, want published_at", got)
+	}
+	if got := query.Get("direction"); got != "desc" {
+		t.Fatalf("direction query = %q, want desc", got)
+	}
+	if got := query.Get("limit"); got != "50" {
+		t.Fatalf("limit query = %q, want 50", got)
+	}
+
+	var response dailyDigestResponse
+	unmarshalToolResultText(t, result, &response)
+	if response.Count != 1 || len(response.AckEntryIDs) != 1 || response.AckEntryIDs[0] != 42 {
+		t.Fatalf("response count/ack ids = %d/%#v, want 1/[42]", response.Count, response.AckEntryIDs)
+	}
+	if response.Entries[0].Content != "This is a complete feed story with enough useful text for a summary." {
+		t.Fatalf("content = %q, want plain text feed content", response.Entries[0].Content)
+	}
+	if response.Entries[0].ContentSource != "feed" {
+		t.Fatalf("content_source = %q, want feed", response.Entries[0].ContentSource)
+	}
+}
+
+func TestGetDailyDigestScrapesShortFeedContentAndTruncates(t *testing.T) {
+	requestPaths := make([]string, 0, 2)
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					requestPaths = append(requestPaths, req.URL.Path)
+					switch req.URL.Path {
+					case "/v1/entries":
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body: io.NopCloser(strings.NewReader(`{
+								"total": 1,
+								"entries": [{
+									"id": 42,
+									"title": "Short feed",
+									"url": "https://example.com/news",
+									"status": "unread",
+									"content": "<p>Short.</p>",
+									"published_at": "2026-05-05T01:30:00Z"
+								}]
+							}`)),
+							Header: http.Header{},
+						}, nil
+					case "/v1/entries/42/fetch-content":
+						return &http.Response{
+							StatusCode: http.StatusOK,
+							Body:       io.NopCloser(strings.NewReader(`{"content":"<article>Scraped content is much longer than the feed summary.</article>"}`)),
+							Header:     http.Header{},
+						}, nil
+					default:
+						t.Fatalf("unexpected path: %s", req.URL.Path)
+					}
+					return nil, nil
+				}),
+			}),
+		),
+	}
+
+	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
+			"now":                "2026-05-05T12:00:00+08:00",
+			"content_mode":       "scrape_when_short",
+			"min_content_length": float64(20),
+			"max_content_length": float64(24),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("handler returned transport error: %v", err)
+	}
+	if result == nil || result.IsError {
+		t.Fatalf("result = %#v, want non-error", result)
+	}
+	if !sameStringSet(requestPaths, []string{"/v1/entries", "/v1/entries/42/fetch-content"}) {
+		t.Fatalf("request paths = %#v, want entries and fetch-content", requestPaths)
+	}
+
+	var response dailyDigestResponse
+	unmarshalToolResultText(t, result, &response)
+	entry := response.Entries[0]
+	if entry.Content != "Scraped content is much" {
+		t.Fatalf("content = %q, want truncated scraped plain text", entry.Content)
+	}
+	if entry.ContentSource != "scraped" {
+		t.Fatalf("content_source = %q, want scraped", entry.ContentSource)
+	}
+	if !entry.ContentTruncated {
+		t.Fatalf("content_truncated = false, want true")
+	}
+	if !entry.ContentAvailable {
+		t.Fatalf("content_available = false, want true")
 	}
 }
 
@@ -430,6 +591,24 @@ func assertToolErrorContains(t *testing.T, result *mcp.CallToolResult, want stri
 	}
 	if !strings.Contains(textContent.Text, want) {
 		t.Fatalf("error text = %q, want to contain %q", textContent.Text, want)
+	}
+}
+
+func unmarshalToolResultText(t *testing.T, result *mcp.CallToolResult, target interface{}) {
+	t.Helper()
+
+	if result == nil {
+		t.Fatalf("result is nil")
+	}
+	if len(result.Content) == 0 {
+		t.Fatalf("result has no content")
+	}
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok {
+		t.Fatalf("result content = %#v, want mcp.TextContent", result.Content[0])
+	}
+	if err := json.Unmarshal([]byte(textContent.Text), target); err != nil {
+		t.Fatalf("failed to unmarshal result text: %v\n%s", err, textContent.Text)
 	}
 }
 

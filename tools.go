@@ -428,6 +428,64 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 		},
 		{
 			Tool: mcp.Tool{
+				Name:        "get_daily_digest",
+				Description: "Get today's unread entries with summary-ready content for Hermes Agent",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"timezone": map[string]interface{}{
+							"type":        "string",
+							"description": "IANA timezone for the daily boundary (default: Asia/Shanghai)",
+						},
+						"since": map[string]interface{}{
+							"description": "Unix timestamp or RFC3339 timestamp to override the default start of day",
+						},
+						"status": map[string]interface{}{
+							"type":        "string",
+							"description": "Entry status to fetch (default: unread)",
+							"enum":        []string{"read", "unread", "removed"},
+						},
+						"date_field": map[string]interface{}{
+							"type":        "string",
+							"description": "Date field used for the since filter (published or changed)",
+							"enum":        []string{"published", "changed"},
+						},
+						"limit": map[string]interface{}{
+							"type":        "number",
+							"description": "Maximum number of entries to fetch (default: 50)",
+						},
+						"feed_id": map[string]interface{}{
+							"type":        "number",
+							"description": "Optional feed ID filter",
+						},
+						"category_id": map[string]interface{}{
+							"type":        "number",
+							"description": "Optional category ID filter",
+						},
+						"content_mode": map[string]interface{}{
+							"type":        "string",
+							"description": "Content retrieval mode (none, feed, scrape_when_short, scrape_all)",
+							"enum":        []string{"none", "feed", "scrape_when_short", "scrape_all"},
+						},
+						"min_content_length": map[string]interface{}{
+							"type":        "number",
+							"description": "Minimum plain-text feed content length before scraping is attempted (default: 500)",
+						},
+						"max_content_length": map[string]interface{}{
+							"type":        "number",
+							"description": "Maximum content length per entry after text cleanup (default: 6000)",
+						},
+						"include_content_html": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Return HTML content instead of plain text (default: false)",
+						},
+					},
+				},
+			},
+			Handler: s.GetDailyDigest,
+		},
+		{
+			Tool: mcp.Tool{
 				Name:        "get_entry",
 				Description: "Get a specific entry by ID",
 				InputSchema: mcp.ToolInputSchema{

@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -19,6 +22,43 @@ type MinifluxServer struct {
 }
 
 const minifluxStartupTimeout = 10 * time.Second
+
+var htmlTagRe = regexp.MustCompile(`<[^>]+>`)
+
+type dailyDigestResponse struct {
+	GeneratedAt time.Time          `json:"generated_at"`
+	Timezone    string             `json:"timezone"`
+	Since       int64              `json:"since"`
+	Status      string             `json:"status"`
+	DateField   string             `json:"date_field"`
+	Total       int                `json:"total"`
+	Count       int                `json:"count"`
+	AckEntryIDs []int64            `json:"ack_entry_ids"`
+	Entries     []dailyDigestEntry `json:"entries"`
+}
+
+type dailyDigestEntry struct {
+	ID               int64     `json:"id"`
+	Title            string    `json:"title"`
+	URL              string    `json:"url"`
+	Status           string    `json:"status"`
+	PublishedAt      time.Time `json:"published_at"`
+	ChangedAt        time.Time `json:"changed_at"`
+	FeedID           int64     `json:"feed_id"`
+	FeedTitle        string    `json:"feed_title,omitempty"`
+	CategoryID       int64     `json:"category_id,omitempty"`
+	CategoryTitle    string    `json:"category_title,omitempty"`
+	Author           string    `json:"author,omitempty"`
+	Tags             []string  `json:"tags,omitempty"`
+	Starred          bool      `json:"starred"`
+	ReadingTime      int       `json:"reading_time,omitempty"`
+	Content          string    `json:"content,omitempty"`
+	ContentSource    string    `json:"content_source"`
+	ContentAvailable bool      `json:"content_available"`
+	ContentTruncated bool      `json:"content_truncated"`
+	ContentLength    int       `json:"content_length"`
+	ContentError     string    `json:"content_error,omitempty"`
+}
 
 func NewMinifluxServer() *MinifluxServer {
 	baseURL := os.Getenv("MINIFLUX_URL")
@@ -188,6 +228,240 @@ func buildEntryFilter(args map[string]interface{}) *client.Filter {
 	}
 
 	return filter
+}
+
+func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	argsMap := map[string]interface{}{}
+	if request.Params.Arguments != nil {
+		var ok bool
+		argsMap, ok = request.Params.Arguments.(map[string]interface{})
+		if !ok {
+			return mcp.NewToolResultError("Invalid arguments format"), nil
+		}
+	}
+
+	options, err := buildDailyDigestOptions(argsMap)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	filter := &client.Filter{
+		Status:    options.status,
+		Limit:     options.limit,
+		Order:     "published_at",
+		Direction: "desc",
+	}
+	if options.dateField == "changed" {
+		filter.ChangedAfter = options.since
+		filter.Order = "changed_at"
+	} else {
+		filter.PublishedAfter = options.since
+	}
+	if feedID, ok := numberArg(argsMap, "feed_id"); ok {
+		filter.FeedID = int64(feedID)
+	}
+	if categoryID, ok := numberArg(argsMap, "category_id"); ok {
+		filter.CategoryID = int64(categoryID)
+	}
+
+	entries, err := s.client.Entries(filter)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to fetch daily digest entries: %v", err)), nil
+	}
+
+	response := dailyDigestResponse{
+		GeneratedAt: options.now,
+		Timezone:    options.timezone,
+		Since:       options.since,
+		Status:      options.status,
+		DateField:   options.dateField,
+		Total:       entries.Total,
+		Count:       len(entries.Entries),
+		AckEntryIDs: make([]int64, 0, len(entries.Entries)),
+		Entries:     make([]dailyDigestEntry, 0, len(entries.Entries)),
+	}
+
+	for _, entry := range entries.Entries {
+		digestEntry := s.buildDailyDigestEntry(entry, options)
+		response.AckEntryIDs = append(response.AckEntryIDs, entry.ID)
+		response.Entries = append(response.Entries, digestEntry)
+	}
+
+	digestJSON, err := json.MarshalIndent(response, "", "  ")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to marshal daily digest: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(digestJSON)), nil
+}
+
+type dailyDigestOptions struct {
+	timezone           string
+	now                time.Time
+	since              int64
+	status             string
+	dateField          string
+	limit              int
+	contentMode        string
+	minContentLength   int
+	maxContentLength   int
+	includeContentHTML bool
+}
+
+func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, error) {
+	options := dailyDigestOptions{
+		timezone:         "Asia/Shanghai",
+		status:           "unread",
+		dateField:        "published",
+		limit:            50,
+		contentMode:      "scrape_when_short",
+		minContentLength: 500,
+		maxContentLength: 6000,
+	}
+
+	if timezone, ok := args["timezone"].(string); ok && timezone != "" {
+		options.timezone = timezone
+	}
+	location, err := time.LoadLocation(options.timezone)
+	if err != nil {
+		return options, fmt.Errorf("invalid timezone: %v", err)
+	}
+
+	options.now = time.Now().In(location)
+	if nowString, ok := args["now"].(string); ok && nowString != "" {
+		now, err := time.Parse(time.RFC3339, nowString)
+		if err != nil {
+			return options, fmt.Errorf("now must be an RFC3339 timestamp")
+		}
+		options.now = now.In(location)
+	}
+
+	if since, ok := numberArg(args, "since"); ok {
+		options.since = int64(since)
+	} else if sinceString, ok := args["since"].(string); ok && sinceString != "" {
+		since, err := time.Parse(time.RFC3339, sinceString)
+		if err != nil {
+			return options, fmt.Errorf("since must be a Unix timestamp or RFC3339 timestamp")
+		}
+		options.since = since.Unix()
+	} else {
+		startOfDay := time.Date(options.now.Year(), options.now.Month(), options.now.Day(), 0, 0, 0, 0, location)
+		options.since = startOfDay.Unix()
+	}
+
+	if status, ok := args["status"].(string); ok && status != "" {
+		options.status = status
+	}
+	if dateField, ok := args["date_field"].(string); ok && dateField != "" {
+		if dateField != "published" && dateField != "changed" {
+			return options, fmt.Errorf("date_field must be published or changed")
+		}
+		options.dateField = dateField
+	}
+	if limit, ok := numberArg(args, "limit"); ok {
+		options.limit = int(limit)
+	}
+	if contentMode, ok := args["content_mode"].(string); ok && contentMode != "" {
+		switch contentMode {
+		case "none", "feed", "scrape_when_short", "scrape_all":
+			options.contentMode = contentMode
+		default:
+			return options, fmt.Errorf("content_mode must be none, feed, scrape_when_short, or scrape_all")
+		}
+	}
+	if minContentLength, ok := numberArg(args, "min_content_length"); ok {
+		options.minContentLength = int(minContentLength)
+	}
+	if maxContentLength, ok := numberArg(args, "max_content_length"); ok {
+		options.maxContentLength = int(maxContentLength)
+	}
+	if includeContentHTML, ok := args["include_content_html"].(bool); ok {
+		options.includeContentHTML = includeContentHTML
+	}
+
+	return options, nil
+}
+
+func (s *MinifluxServer) buildDailyDigestEntry(entry *client.Entry, options dailyDigestOptions) dailyDigestEntry {
+	digestEntry := dailyDigestEntry{
+		ID:          entry.ID,
+		Title:       entry.Title,
+		URL:         entry.URL,
+		Status:      entry.Status,
+		PublishedAt: entry.Date,
+		ChangedAt:   entry.ChangedAt,
+		FeedID:      entry.FeedID,
+		Author:      entry.Author,
+		Tags:        entry.Tags,
+		Starred:     entry.Starred,
+		ReadingTime: entry.ReadingTime,
+	}
+	if entry.Feed != nil {
+		digestEntry.FeedID = entry.Feed.ID
+		digestEntry.FeedTitle = entry.Feed.Title
+		if entry.Feed.Category != nil {
+			digestEntry.CategoryID = entry.Feed.Category.ID
+			digestEntry.CategoryTitle = entry.Feed.Category.Title
+		}
+	}
+
+	content, source, contentErr := s.digestEntryContent(entry, options)
+	digestEntry.ContentSource = source
+	digestEntry.ContentError = contentErr
+	digestEntry.ContentAvailable = strings.TrimSpace(content) != ""
+
+	if !options.includeContentHTML {
+		content = htmlToPlainText(content)
+	}
+	content, truncated := truncateContent(content, options.maxContentLength)
+	digestEntry.Content = content
+	digestEntry.ContentLength = len(content)
+	digestEntry.ContentAvailable = strings.TrimSpace(content) != ""
+	digestEntry.ContentTruncated = truncated
+
+	return digestEntry
+}
+
+func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDigestOptions) (string, string, string) {
+	switch options.contentMode {
+	case "none":
+		return "", "none", ""
+	case "scrape_all":
+		content, err := s.client.FetchEntryOriginalContent(entry.ID)
+		if err != nil {
+			return entry.Content, "feed", err.Error()
+		}
+		return content, "scraped", ""
+	case "scrape_when_short":
+		if len(htmlToPlainText(entry.Content)) >= options.minContentLength {
+			return entry.Content, "feed", ""
+		}
+		content, err := s.client.FetchEntryOriginalContent(entry.ID)
+		if err != nil {
+			return entry.Content, "feed", err.Error()
+		}
+		return content, "scraped", ""
+	default:
+		return entry.Content, "feed", ""
+	}
+}
+
+func htmlToPlainText(content string) string {
+	withoutTags := htmlTagRe.ReplaceAllString(content, " ")
+	return strings.Join(strings.Fields(html.UnescapeString(withoutTags)), " ")
+}
+
+func truncateContent(content string, maxLength int) (string, bool) {
+	content = strings.TrimSpace(content)
+	if maxLength <= 0 || len(content) <= maxLength {
+		return content, false
+	}
+	return strings.TrimSpace(content[:maxLength]), true
+}
+
+func numberArg(args map[string]interface{}, key string) (float64, bool) {
+	value, ok := args[key].(float64)
+	return value, ok
 }
 
 func buildScopedEntryFilter(args map[string]interface{}, routeIDKey string) *client.Filter {
