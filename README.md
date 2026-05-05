@@ -89,7 +89,7 @@ The Miniflux MCP Server provides **49 tools** covering Miniflux API functionalit
 ### Feed Management (12 tools)
 - `get_feeds` - Get all RSS/Atom feeds
 - `get_feed` - Get a specific feed by ID
-- `create_feed` - Add a new RSS/Atom feed
+- `create_feed` - Add a new RSS/Atom feed with optional Miniflux feed settings such as category, scraper/rewrite rules, auth, cookies, proxy, HTTP cache, HTTP/2, and visibility flags
 - `delete_feed` - Delete a specific feed
 - `update_feed` - Update feed settings
 - `refresh_feed` - Manually refresh a specific feed

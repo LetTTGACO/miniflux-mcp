@@ -236,6 +236,35 @@ func buildFeedModificationRequest(args map[string]interface{}) *client.FeedModif
 	return request
 }
 
+func buildFeedCreationRequest(args map[string]interface{}) *client.FeedCreationRequest {
+	request := &client.FeedCreationRequest{CategoryID: 1}
+
+	setString(args, "feed_url", &request.FeedURL)
+	setInt64(args, "category_id", &request.CategoryID)
+	setString(args, "user_agent", &request.UserAgent)
+	setString(args, "cookie", &request.Cookie)
+	setString(args, "username", &request.Username)
+	setString(args, "password", &request.Password)
+	setBool(args, "crawler", &request.Crawler)
+	setBool(args, "ignore_entry_updates", &request.IgnoreEntryUpdates)
+	setBool(args, "disabled", &request.Disabled)
+	setBool(args, "ignore_http_cache", &request.IgnoreHTTPCache)
+	setBool(args, "allow_self_signed_certificates", &request.AllowSelfSignedCertificates)
+	setBool(args, "fetch_via_proxy", &request.FetchViaProxy)
+	setString(args, "scraper_rules", &request.ScraperRules)
+	setString(args, "rewrite_rules", &request.RewriteRules)
+	setString(args, "urlrewrite_rules", &request.UrlRewriteRules)
+	setString(args, "blocklist_rules", &request.BlocklistRules)
+	setString(args, "keeplist_rules", &request.KeeplistRules)
+	setString(args, "block_filter_entry_rules", &request.BlockFilterEntryRules)
+	setString(args, "keep_filter_entry_rules", &request.KeepFilterEntryRules)
+	setBool(args, "hide_globally", &request.HideGlobally)
+	setBool(args, "disable_http2", &request.DisableHTTP2)
+	setString(args, "proxy_url", &request.ProxyURL)
+
+	return request
+}
+
 func buildEntryModificationRequest(args map[string]interface{}) *client.EntryModificationRequest {
 	request := &client.EntryModificationRequest{}
 
@@ -288,6 +317,24 @@ func setInt64Ptr(args map[string]interface{}, key string, dest **int64) {
 	if value, ok := args[key].(float64); ok {
 		intValue := int64(value)
 		*dest = &intValue
+	}
+}
+
+func setString(args map[string]interface{}, key string, dest *string) {
+	if value, ok := args[key].(string); ok {
+		*dest = value
+	}
+}
+
+func setBool(args map[string]interface{}, key string, dest *bool) {
+	if value, ok := args[key].(bool); ok {
+		*dest = value
+	}
+}
+
+func setInt64(args map[string]interface{}, key string, dest *int64) {
+	if value, ok := args[key].(float64); ok {
+		*dest = int64(value)
 	}
 }
 
@@ -362,36 +409,11 @@ func (s *MinifluxServer) CreateFeed(ctx context.Context, request mcp.CallToolReq
 		return mcp.NewToolResultError("Invalid arguments format"), nil
 	}
 
-	feedURL, ok := argsMap["feed_url"].(string)
-	if !ok {
+	if _, ok := argsMap["feed_url"].(string); !ok {
 		return mcp.NewToolResultError("feed_url must be a string"), nil
 	}
 
-	var categoryID int64 = 1 // Default category
-	if categoryIDFloat, ok := argsMap["category_id"].(float64); ok {
-		categoryID = int64(categoryIDFloat)
-	}
-
-	feedRequest := &client.FeedCreationRequest{
-		FeedURL:    feedURL,
-		CategoryID: categoryID,
-	}
-
-	if crawler, ok := argsMap["crawler"].(bool); ok {
-		feedRequest.Crawler = crawler
-	}
-
-	if userAgent, ok := argsMap["user_agent"].(string); ok {
-		feedRequest.UserAgent = userAgent
-	}
-
-	if username, ok := argsMap["username"].(string); ok {
-		feedRequest.Username = username
-	}
-
-	if password, ok := argsMap["password"].(string); ok {
-		feedRequest.Password = password
-	}
+	feedRequest := buildFeedCreationRequest(argsMap)
 
 	createdFeed, err := s.client.CreateFeed(feedRequest)
 	if err != nil {
