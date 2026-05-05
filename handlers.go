@@ -255,7 +255,7 @@ func (s *MinifluxServer) GetCategoryEntry(ctx context.Context, request mcp.CallT
 	return mcp.NewToolResultText(string(entryJSON)), nil
 }
 
-func (s *MinifluxServer) ToggleBookmark(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *MinifluxServer) ToggleStarred(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
 		return mcp.NewToolResultError("entry_id is required"), nil
@@ -274,10 +274,10 @@ func (s *MinifluxServer) ToggleBookmark(ctx context.Context, request mcp.CallToo
 	entryID := int64(entryIDFloat)
 	err := s.client.ToggleStarred(entryID)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to toggle starred/bookmark status: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to toggle starred status: %v", err)), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Starred/bookmark status toggled for entry %d", entryID)), nil
+	return mcp.NewToolResultText(fmt.Sprintf("Starred status toggled for entry %d", entryID)), nil
 }
 
 func (s *MinifluxServer) SaveEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
