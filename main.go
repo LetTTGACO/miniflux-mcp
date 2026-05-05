@@ -46,7 +46,7 @@ func newMinifluxServerFromConfig(baseURL, apiKey, username, password string, sta
 		startupTimeout = minifluxStartupTimeout
 	}
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: startupTimeout}
+		httpClient = &http.Client{}
 	}
 
 	options := []client.Option{client.WithHTTPClient(httpClient)}

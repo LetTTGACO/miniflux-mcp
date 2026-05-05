@@ -8,6 +8,7 @@ PORT="${MINIFLUX_INTEGRATION_PORT:-18080}"
 MINIFLUX_URL="${MINIFLUX_URL:-http://127.0.0.1:${PORT}}"
 MINIFLUX_USERNAME="${MINIFLUX_INTEGRATION_USERNAME:-admin}"
 MINIFLUX_PASSWORD="${MINIFLUX_INTEGRATION_PASSWORD:-miniflux-admin}"
+SMOKE_FEED_URL="${MINIFLUX_INTEGRATION_FEED_URL:-https://cprss.s3.amazonaws.com/javascriptweekly.com.xml}"
 KEEP_MINIFLUX="${KEEP_MINIFLUX:-0}"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -71,6 +72,7 @@ func main() {
 	minifluxURL := mustEnv("MINIFLUX_URL")
 	username := mustEnv("MINIFLUX_USERNAME")
 	password := mustEnv("MINIFLUX_PASSWORD")
+	smokeFeedURL := mustEnv("SMOKE_FEED_URL")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -110,6 +112,8 @@ func main() {
 	for _, toolName := range []string{"healthcheck", "get_me", "get_categories", "get_feeds"} {
 		callTool(ctx, c, toolName)
 	}
+	callToolWithArgs(ctx, c, "create_feed", map[string]any{"feed_url": smokeFeedURL})
+	callTool(ctx, c, "get_feeds")
 
 	fmt.Printf("integration smoke passed for %s\n", filepath.Base(rootDir))
 }
@@ -140,9 +144,13 @@ func filteredEnv(names ...string) []string {
 }
 
 func callTool(ctx context.Context, c *mcpclient.Client, name string) {
+	callToolWithArgs(ctx, c, name, map[string]any{})
+}
+
+func callToolWithArgs(ctx context.Context, c *mcpclient.Client, name string, args map[string]any) {
 	req := mcp.CallToolRequest{}
 	req.Params.Name = name
-	req.Params.Arguments = map[string]any{}
+	req.Params.Arguments = args
 
 	result, err := c.CallTool(ctx, req)
 	if err != nil {
@@ -161,6 +169,7 @@ ROOT_DIR="${ROOT_DIR}" \
 MINIFLUX_URL="${MINIFLUX_URL}" \
 MINIFLUX_USERNAME="${MINIFLUX_USERNAME}" \
 MINIFLUX_PASSWORD="${MINIFLUX_PASSWORD}" \
+SMOKE_FEED_URL="${SMOKE_FEED_URL}" \
 go run "${TMP_DIR}/smoke.go"
 
 if [[ "${KEEP_MINIFLUX}" == "1" ]]; then

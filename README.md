@@ -59,7 +59,7 @@ To test this MCP server against a disposable local Miniflux instance:
 scripts/integration-smoke.sh
 ```
 
-This starts Miniflux and Postgres through `docker-compose.integration.yml`, then calls the MCP tools `healthcheck`, `get_me`, `get_categories`, and `get_feeds` over stdio. Set `KEEP_MINIFLUX=1` to leave the local stack running after the smoke test.
+This starts Miniflux and Postgres through `docker-compose.integration.yml`, then calls the MCP tools `healthcheck`, `get_me`, `get_categories`, `get_feeds`, `create_feed`, and `get_feeds` again over stdio. The default feed is `https://cprss.s3.amazonaws.com/javascriptweekly.com.xml`; set `MINIFLUX_INTEGRATION_FEED_URL` to test another RSS/Atom URL. Set `KEEP_MINIFLUX=1` to leave the local stack running after the smoke test.
 
 ### Integration with Claude Desktop
 

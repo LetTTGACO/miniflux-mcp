@@ -47,12 +47,18 @@ Use the optional integration stack when you want to verify the MCP server agains
 scripts/integration-smoke.sh
 ```
 
-The script starts Miniflux and Postgres with `docker-compose.integration.yml`, waits for `/healthcheck`, then runs the MCP server over stdio and calls `healthcheck`, `get_me`, `get_categories`, and `get_feeds`. It removes the integration containers and database volume when it exits.
+The script starts Miniflux and Postgres with `docker-compose.integration.yml`, waits for `/healthcheck`, then runs the MCP server over stdio. It calls `healthcheck`, `get_me`, `get_categories`, `get_feeds`, creates a feed from `https://cprss.s3.amazonaws.com/javascriptweekly.com.xml`, and calls `get_feeds` again. It removes the integration containers and database volume when it exits.
 
 To keep the local Miniflux stack running for manual testing:
 
 ```bash
 KEEP_MINIFLUX=1 scripts/integration-smoke.sh
+```
+
+To test a different feed URL:
+
+```bash
+MINIFLUX_INTEGRATION_FEED_URL=https://example.com/feed.xml scripts/integration-smoke.sh
 ```
 
 ## API Coverage Changes
