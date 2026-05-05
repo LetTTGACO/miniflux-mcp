@@ -5,6 +5,10 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +20,304 @@ type roundTripperFunc func(req *http.Request) (*http.Response, error)
 
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
+}
+
+func TestToolDefinitionsStayInSyncWithREADME(t *testing.T) {
+	toolDefs := minifluxToolDefinitions(&MinifluxServer{})
+	if len(toolDefs) != 49 {
+		t.Fatalf("registered tools = %d, want 49", len(toolDefs))
+	}
+
+	registeredNames := make(map[string]bool, len(toolDefs))
+	for _, toolDef := range toolDefs {
+		if toolDef.Tool.Name == "" {
+			t.Fatalf("tool with empty name: %#v", toolDef.Tool)
+		}
+		if registeredNames[toolDef.Tool.Name] {
+			t.Fatalf("duplicate tool name registered: %s", toolDef.Tool.Name)
+		}
+		registeredNames[toolDef.Tool.Name] = true
+		if toolDef.Handler == nil {
+			t.Fatalf("tool %s has nil handler", toolDef.Tool.Name)
+		}
+	}
+
+	readmeBytes, err := os.ReadFile("README.md")
+	if err != nil {
+		t.Fatalf("failed to read README.md: %v", err)
+	}
+	readme := string(readmeBytes)
+
+	totalRe := regexp.MustCompile(`provides \*\*(\d+) tools\*\*`)
+	totalMatch := totalRe.FindStringSubmatch(readme)
+	if len(totalMatch) != 2 {
+		t.Fatalf("README total tool count not found")
+	}
+	readmeTotal, err := strconv.Atoi(totalMatch[1])
+	if err != nil {
+		t.Fatalf("invalid README total tool count %q: %v", totalMatch[1], err)
+	}
+	if readmeTotal != len(toolDefs) {
+		t.Fatalf("README total = %d, registered tools = %d", readmeTotal, len(toolDefs))
+	}
+
+	readmeNames, groupCounts := readmeToolNamesAndGroupCounts(t, readme)
+	if len(readmeNames) != len(toolDefs) {
+		t.Fatalf("README lists %d tools, registered tools = %d", len(readmeNames), len(toolDefs))
+	}
+	for name := range registeredNames {
+		if !readmeNames[name] {
+			t.Fatalf("registered tool %q is missing from README", name)
+		}
+	}
+	for name := range readmeNames {
+		if !registeredNames[name] {
+			t.Fatalf("README lists unknown tool %q", name)
+		}
+	}
+
+	for group, count := range groupCounts {
+		if count.declared != count.actual {
+			t.Fatalf("README group %q declares %d tools, lists %d", group, count.declared, count.actual)
+		}
+	}
+}
+
+type readmeGroupCount struct {
+	declared int
+	actual   int
+}
+
+func readmeToolNamesAndGroupCounts(t *testing.T, readme string) (map[string]bool, map[string]readmeGroupCount) {
+	t.Helper()
+
+	names := map[string]bool{}
+	groupCounts := map[string]readmeGroupCount{}
+	headingRe := regexp.MustCompile(`^### (.+) \((\d+) tools\)$`)
+	toolRe := regexp.MustCompile("^- `([^`]+)` - ")
+
+	currentGroup := ""
+	for _, line := range strings.Split(readme, "\n") {
+		if match := headingRe.FindStringSubmatch(line); len(match) == 3 {
+			declared, err := strconv.Atoi(match[2])
+			if err != nil {
+				t.Fatalf("invalid README group count %q: %v", match[2], err)
+			}
+			currentGroup = match[1]
+			groupCounts[currentGroup] = readmeGroupCount{declared: declared}
+			continue
+		}
+
+		match := toolRe.FindStringSubmatch(line)
+		if len(match) != 2 {
+			continue
+		}
+		if currentGroup == "" {
+			t.Fatalf("README tool %q appears before a group heading", match[1])
+		}
+		if names[match[1]] {
+			t.Fatalf("README lists duplicate tool %q", match[1])
+		}
+		names[match[1]] = true
+
+		count := groupCounts[currentGroup]
+		count.actual++
+		groupCounts[currentGroup] = count
+	}
+
+	return names, groupCounts
+}
+
+func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
+	toolDefs := minifluxToolDefinitions(&MinifluxServer{})
+	toolsByName := make(map[string]mcp.Tool, len(toolDefs))
+	for _, toolDef := range toolDefs {
+		toolsByName[toolDef.Tool.Name] = toolDef.Tool
+	}
+
+	requiredByTool := map[string][]string{
+		"get_feed":               {"feed_id"},
+		"create_feed":            {"feed_url"},
+		"delete_feed":            {"feed_id"},
+		"update_feed":            {"feed_id"},
+		"refresh_feed":           {"feed_id"},
+		"get_feed_entries":       {"feed_id"},
+		"get_feed_entry":         {"feed_id", "entry_id"},
+		"import_feed_entry":      {"feed_id", "url"},
+		"get_feed_icon":          {"feed_id"},
+		"mark_feed_as_read":      {"feed_id"},
+		"get_entry":              {"entry_id"},
+		"update_entry_status":    {"entry_id", "status"},
+		"toggle_starred":         {"entry_id"},
+		"update_entry":           {"entry_id"},
+		"save_entry":             {"entry_id"},
+		"fetch_original_content": {"entry_id"},
+		"mark_all_as_read":       {"user_id"},
+		"create_category":        {"title"},
+		"update_category":        {"category_id", "title"},
+		"delete_category":        {"category_id"},
+		"get_category_feeds":     {"category_id"},
+		"get_category_entries":   {"category_id"},
+		"get_category_entry":     {"category_id", "entry_id"},
+		"mark_category_as_read":  {"category_id"},
+		"refresh_category":       {"category_id"},
+		"get_user_by_id":         {"user_id"},
+		"get_user_by_username":   {"username"},
+		"create_user":            {"username", "password"},
+		"delete_user":            {"user_id"},
+		"discover":               {"url"},
+		"import_opml":            {"opml_content"},
+		"create_api_key":         {"description"},
+		"delete_api_key":         {"api_key_id"},
+		"get_icon":               {"icon_id"},
+		"get_enclosure":          {"enclosure_id"},
+		"update_enclosure":       {"enclosure_id", "media_progression"},
+	}
+
+	for toolName, wantRequired := range requiredByTool {
+		tool, ok := toolsByName[toolName]
+		if !ok {
+			t.Fatalf("tool %q is not registered", toolName)
+		}
+		if !sameStringSet(tool.InputSchema.Required, wantRequired) {
+			t.Fatalf("%s required = %#v, want %#v", toolName, tool.InputSchema.Required, wantRequired)
+		}
+		for _, required := range wantRequired {
+			if _, ok := tool.InputSchema.Properties[required]; !ok {
+				t.Fatalf("%s requires %q but does not define it in properties", toolName, required)
+			}
+		}
+	}
+
+	for _, toolName := range []string{
+		"get_feeds",
+		"refresh_all_feeds",
+		"get_entries",
+		"get_categories",
+		"get_users",
+		"get_me",
+		"get_version",
+		"healthcheck",
+		"fetch_counters",
+		"get_integrations_status",
+		"export",
+		"flush_history",
+		"get_api_keys",
+	} {
+		tool, ok := toolsByName[toolName]
+		if !ok {
+			t.Fatalf("tool %q is not registered", toolName)
+		}
+		if len(tool.InputSchema.Required) != 0 {
+			t.Fatalf("%s required = %#v, want none", toolName, tool.InputSchema.Required)
+		}
+	}
+}
+
+func TestEntryFilterSchemaMatchesSupportedArguments(t *testing.T) {
+	properties := entryFilterProperties()
+	filter := buildEntryFilter(map[string]interface{}{
+		"status":           "unread",
+		"statuses":         []interface{}{"read"},
+		"feed_id":          float64(1),
+		"category_id":      float64(2),
+		"limit":            float64(3),
+		"offset":           float64(4),
+		"order":            "published_at",
+		"direction":        "desc",
+		"starred":          true,
+		"before":           float64(5),
+		"after":            float64(6),
+		"published_before": float64(7),
+		"published_after":  float64(8),
+		"changed_before":   float64(9),
+		"changed_after":    float64(10),
+		"before_entry_id":  float64(11),
+		"after_entry_id":   float64(12),
+		"search":           "rss",
+		"globally_visible": true,
+	})
+
+	expectedProperties := []string{
+		"status",
+		"statuses",
+		"feed_id",
+		"category_id",
+		"limit",
+		"offset",
+		"order",
+		"direction",
+		"starred",
+		"before",
+		"after",
+		"published_before",
+		"published_after",
+		"changed_before",
+		"changed_after",
+		"before_entry_id",
+		"after_entry_id",
+		"search",
+		"globally_visible",
+	}
+
+	if len(properties) != len(expectedProperties) {
+		t.Fatalf("entry filter schema has %d properties, want %d", len(properties), len(expectedProperties))
+	}
+	for _, property := range expectedProperties {
+		if _, ok := properties[property]; !ok {
+			t.Fatalf("entry filter schema is missing %q", property)
+		}
+	}
+	if filter.Status == "" || len(filter.Statuses) == 0 || filter.FeedID == 0 || filter.CategoryID == 0 ||
+		filter.Limit == 0 || filter.Offset == 0 || filter.Order == "" || filter.Direction == "" ||
+		filter.Starred == "" || filter.Before == 0 || filter.After == 0 || filter.PublishedBefore == 0 ||
+		filter.PublishedAfter == 0 || filter.ChangedBefore == 0 || filter.ChangedAfter == 0 ||
+		filter.BeforeEntryID == 0 || filter.AfterEntryID == 0 || filter.Search == "" || !filter.GloballyVisible {
+		t.Fatalf("buildEntryFilter did not map every argument covered by the schema: %#v", filter)
+	}
+}
+
+func TestImportOPMLSchemaOnlyAcceptsContent(t *testing.T) {
+	tool := toolDefinitionByName(t, "import_opml")
+
+	if !sameStringSet(tool.InputSchema.Required, []string{"opml_content"}) {
+		t.Fatalf("import_opml required = %#v, want opml_content", tool.InputSchema.Required)
+	}
+	if _, ok := tool.InputSchema.Properties["opml_content"]; !ok {
+		t.Fatalf("import_opml schema is missing opml_content")
+	}
+	if _, ok := tool.InputSchema.Properties["file_path"]; ok {
+		t.Fatalf("import_opml schema must not accept file_path")
+	}
+}
+
+func toolDefinitionByName(t *testing.T, name string) mcp.Tool {
+	t.Helper()
+
+	for _, toolDef := range minifluxToolDefinitions(&MinifluxServer{}) {
+		if toolDef.Tool.Name == name {
+			return toolDef.Tool
+		}
+	}
+	t.Fatalf("tool %q is not registered", name)
+	return mcp.Tool{}
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[string]int, len(a))
+	for _, value := range a {
+		seen[value]++
+	}
+	for _, value := range b {
+		seen[value]--
+		if seen[value] < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func TestImportOPMLPostsProvidedContent(t *testing.T) {

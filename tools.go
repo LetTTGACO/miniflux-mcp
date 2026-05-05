@@ -103,8 +103,8 @@ func entryFilterPropertiesWithRouteID(routeIDKey, description string) map[string
 	return properties
 }
 
-func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
-	tools := []ToolDefinition{
+func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
+	return []ToolDefinition{
 		// Feed Operations
 		{
 			Tool: mcp.Tool{
@@ -1002,9 +1002,11 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 			Handler: s.UpdateEnclosure,
 		},
 	}
+}
 
+func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 	// Register all tools
-	for _, toolDef := range tools {
+	for _, toolDef := range minifluxToolDefinitions(s) {
 		mcpServer.AddTool(toolDef.Tool, toolDef.Handler)
 	}
 }
