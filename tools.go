@@ -467,6 +467,31 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 		},
 		{
 			Tool: mcp.Tool{
+				Name:        "update_entries_status",
+				Description: "Update the status of multiple entries (mark as read/unread/removed)",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"entry_ids": map[string]interface{}{
+							"type":        "array",
+							"description": "The IDs of the entries to update",
+							"items": map[string]interface{}{
+								"type": "number",
+							},
+						},
+						"status": map[string]interface{}{
+							"type":        "string",
+							"description": "New status for the entries (read, unread, removed)",
+							"enum":        []string{"read", "unread", "removed"},
+						},
+					},
+					Required: []string{"entry_ids", "status"},
+				},
+			},
+			Handler: s.UpdateEntriesStatus,
+		},
+		{
+			Tool: mcp.Tool{
 				Name:        "toggle_starred",
 				Description: "Toggle starred status of an entry",
 				InputSchema: mcp.ToolInputSchema{
