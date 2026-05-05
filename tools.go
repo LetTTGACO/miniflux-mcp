@@ -5,11 +5,16 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// ToolDefinition couples the MCP schema shown to clients with the handler that
+// executes that tool.
 type ToolDefinition struct {
 	Tool    mcp.Tool
 	Handler server.ToolHandlerFunc
 }
 
+// entryFilterProperties is the shared MCP-visible schema for entry list filters.
+// The description fields are part of the tool contract that AI agents read when
+// deciding which arguments to send.
 func entryFilterProperties() map[string]interface{} {
 	return map[string]interface{}{
 		"status": map[string]interface{}{
@@ -103,6 +108,9 @@ func entryFilterPropertiesWithRouteID(routeIDKey, description string) map[string
 	return properties
 }
 
+// minifluxToolDefinitions is the single source of truth for registered MCP tools.
+// Keep each tool description and argument description explicit: these strings are
+// surfaced to clients and help agents choose tools without reading the Go code.
 func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 	return []ToolDefinition{
 		// Feed Operations
@@ -1081,7 +1089,6 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 }
 
 func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
-	// Register all tools
 	for _, toolDef := range minifluxToolDefinitions(s) {
 		mcpServer.AddTool(toolDef.Tool, toolDef.Handler)
 	}
