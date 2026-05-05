@@ -84,9 +84,9 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
 
 ## Available Tools
 
-The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functionality, which can be found in the [Miniflux API Reference](https://miniflux.app/docs/api.html#go-client).
+The Miniflux MCP Server provides **49 tools** covering Miniflux API functionality, which can be found in the [Miniflux API Reference](https://miniflux.app/docs/api.html#go-client).
 
-### Feed Management (10 tools)
+### Feed Management (12 tools)
 - `get_feeds` - Get all RSS/Atom feeds
 - `get_feed` - Get a specific feed by ID
 - `create_feed` - Add a new RSS/Atom feed
@@ -100,7 +100,7 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `get_feed_icon` - Get the icon of a specific feed
 - `mark_feed_as_read` - Mark all entries in a feed as read
 
-### Entry Management (8 tools)
+### Entry Management (9 tools)
 - `get_entries` - Get entries with optional filtering
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
@@ -129,13 +129,14 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `create_user` - Create a new user
 - `delete_user` - Delete a user
 
-### System & Utility (7 tools)
+### System & Utility (8 tools)
 - `get_version` - Get Miniflux version information
 - `healthcheck` - Perform a health check
 - `fetch_counters` - Fetch feed counters
 - `get_integrations_status` - Get integrations status
 - `discover` - Discover feeds from a URL
 - `export` - Export feeds as OPML
+- `import_opml` - Import feeds from OPML content
 - `flush_history` - Flush the read history
 
 ### API Key Management (3 tools)
@@ -143,7 +144,7 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `create_api_key` - Create a new API key
 - `delete_api_key` - Delete an API key
 
-### Icons & Media (2 tools)
+### Icons & Media (3 tools)
 - `get_icon` - Get an icon by ID
 - `get_enclosure` - Get an enclosure by ID
 - `update_enclosure` - Update enclosure media progression

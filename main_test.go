@@ -1,6 +1,92 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"context"
+	"io"
+	"net/http"
+	"testing"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"miniflux.app/v2/client"
+)
+
+type roundTripperFunc func(req *http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
+}
+
+func TestImportOPMLPostsProvidedContent(t *testing.T) {
+	opmlContent := `<?xml version="1.0"?><opml version="2.0"><body></body></opml>`
+
+	minifluxClient := client.NewClientWithOptions(
+		"http://mf",
+		client.WithHTTPClient(&http.Client{
+			Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				if req.Method != http.MethodPost {
+					t.Fatalf("method = %s, want POST", req.Method)
+				}
+				if req.URL.String() != "http://mf/v1/import" {
+					t.Fatalf("url = %s, want http://mf/v1/import", req.URL.String())
+				}
+
+				body, err := io.ReadAll(req.Body)
+				if err != nil {
+					t.Fatalf("failed to read request body: %v", err)
+				}
+				if string(body) != opmlContent {
+					t.Fatalf("body = %q, want OPML content", string(body))
+				}
+
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString("")),
+					Header:     http.Header{},
+				}, nil
+			}),
+		}),
+	)
+	server := &MinifluxServer{client: minifluxClient}
+
+	result, err := server.ImportOPML(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name: "import_opml",
+			Arguments: map[string]interface{}{
+				"opml_content": opmlContent,
+			},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("ImportOPML returned error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("ImportOPML returned MCP error: %#v", result.Content)
+	}
+	textContent, ok := result.Content[0].(mcp.TextContent)
+	if !ok || textContent.Text != "OPML imported successfully" {
+		t.Fatalf("result content = %#v, want success text", result.Content)
+	}
+}
+
+func TestImportOPMLRequiresContent(t *testing.T) {
+	server := &MinifluxServer{}
+
+	result, err := server.ImportOPML(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{
+			Name:      "import_opml",
+			Arguments: map[string]interface{}{},
+		},
+	})
+
+	if err != nil {
+		t.Fatalf("ImportOPML returned error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatalf("ImportOPML IsError = false, want true")
+	}
+}
 
 func TestBuildEntryFilterMapsSupportedArguments(t *testing.T) {
 	filter := buildEntryFilter(map[string]interface{}{

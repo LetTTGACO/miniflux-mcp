@@ -830,6 +830,23 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 		},
 		{
 			Tool: mcp.Tool{
+				Name:        "import_opml",
+				Description: "Import feeds from OPML content",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"opml_content": map[string]interface{}{
+							"type":        "string",
+							"description": "The OPML document content to import",
+						},
+					},
+					Required: []string{"opml_content"},
+				},
+			},
+			Handler: s.ImportOPML,
+		},
+		{
+			Tool: mcp.Tool{
 				Name:        "flush_history",
 				Description: "Flush the read history",
 				InputSchema: mcp.ToolInputSchema{
