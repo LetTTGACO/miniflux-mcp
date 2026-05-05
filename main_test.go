@@ -355,6 +355,64 @@ func TestBuildFeedModificationRequestMapsSupportedArguments(t *testing.T) {
 	}
 }
 
+func TestBuildFeedCreationRequestMapsSupportedArguments(t *testing.T) {
+	req := buildFeedCreationRequest(map[string]interface{}{
+		"feed_url":                       "https://example.com/feed.xml",
+		"category_id":                    float64(7),
+		"user_agent":                     "Agent",
+		"cookie":                         "k=v",
+		"username":                       "user",
+		"password":                       "pass",
+		"crawler":                        true,
+		"ignore_entry_updates":           true,
+		"disabled":                       true,
+		"ignore_http_cache":              true,
+		"allow_self_signed_certificates": true,
+		"fetch_via_proxy":                true,
+		"scraper_rules":                  "article",
+		"rewrite_rules":                  "rewrite",
+		"urlrewrite_rules":               "url rewrite",
+		"blocklist_rules":                "block",
+		"keeplist_rules":                 "keep",
+		"block_filter_entry_rules":       "entry block",
+		"keep_filter_entry_rules":        "entry keep",
+		"hide_globally":                  true,
+		"disable_http2":                  true,
+		"proxy_url":                      "socks5://localhost:1080",
+	})
+
+	if req.FeedURL != "https://example.com/feed.xml" {
+		t.Fatalf("FeedURL = %q, want feed URL", req.FeedURL)
+	}
+	if req.CategoryID != 7 {
+		t.Fatalf("CategoryID = %d, want 7", req.CategoryID)
+	}
+	if req.UserAgent != "Agent" || req.Cookie != "k=v" {
+		t.Fatalf("UserAgent/Cookie = %q/%q, want Agent/k=v", req.UserAgent, req.Cookie)
+	}
+	if req.Username != "user" || req.Password != "pass" {
+		t.Fatalf("Username/Password = %q/%q, want user/pass", req.Username, req.Password)
+	}
+	if !req.Crawler || !req.IgnoreEntryUpdates || !req.Disabled || !req.IgnoreHTTPCache {
+		t.Fatalf("primary booleans not mapped")
+	}
+	if !req.AllowSelfSignedCertificates || !req.FetchViaProxy || !req.HideGlobally || !req.DisableHTTP2 {
+		t.Fatalf("advanced booleans not mapped")
+	}
+	if req.ScraperRules != "article" || req.RewriteRules != "rewrite" || req.UrlRewriteRules != "url rewrite" {
+		t.Fatalf("scraper/rewrite rules not mapped")
+	}
+	if req.BlocklistRules != "block" || req.KeeplistRules != "keep" {
+		t.Fatalf("blocklist/keeplist rules not mapped")
+	}
+	if req.BlockFilterEntryRules != "entry block" || req.KeepFilterEntryRules != "entry keep" {
+		t.Fatalf("entry filter rules not mapped")
+	}
+	if req.ProxyURL != "socks5://localhost:1080" {
+		t.Fatalf("ProxyURL = %q, want proxy URL", req.ProxyURL)
+	}
+}
+
 func TestBuildEntryModificationRequestMapsSupportedArguments(t *testing.T) {
 	req := buildEntryModificationRequest(map[string]interface{}{
 		"title":   "New title",

@@ -153,9 +153,17 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 							"type":        "boolean",
 							"description": "Enable web scraper for full content",
 						},
+						"ignore_entry_updates": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Ignore entry updates for this feed",
+						},
 						"user_agent": map[string]interface{}{
 							"type":        "string",
 							"description": "Custom user agent for feed fetching",
+						},
+						"cookie": map[string]interface{}{
+							"type":        "string",
+							"description": "HTTP cookie for feed fetching",
 						},
 						"username": map[string]interface{}{
 							"type":        "string",
@@ -164,6 +172,62 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 						"password": map[string]interface{}{
 							"type":        "string",
 							"description": "Password for HTTP basic authentication",
+						},
+						"disabled": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Disable feed refresh",
+						},
+						"ignore_http_cache": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Ignore HTTP cache",
+						},
+						"allow_self_signed_certificates": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Allow self-signed certificates",
+						},
+						"fetch_via_proxy": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Fetch via configured proxy",
+						},
+						"scraper_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Scraper rules",
+						},
+						"rewrite_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Rewrite rules",
+						},
+						"urlrewrite_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "URL rewrite rules",
+						},
+						"blocklist_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Blocklist rules",
+						},
+						"keeplist_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Keeplist rules",
+						},
+						"block_filter_entry_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Entry block filter rules",
+						},
+						"keep_filter_entry_rules": map[string]interface{}{
+							"type":        "string",
+							"description": "Entry keep filter rules",
+						},
+						"hide_globally": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Hide entries from global views",
+						},
+						"disable_http2": map[string]interface{}{
+							"type":        "boolean",
+							"description": "Disable HTTP/2",
+						},
+						"proxy_url": map[string]interface{}{
+							"type":        "string",
+							"description": "Per-feed proxy URL",
 						},
 					},
 					Required: []string{"feed_url"},
