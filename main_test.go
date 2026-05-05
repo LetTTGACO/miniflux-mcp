@@ -62,3 +62,94 @@ func TestBuildEntryFilterMapsSupportedArguments(t *testing.T) {
 		t.Fatalf("GloballyVisible = false, want true")
 	}
 }
+
+func TestBuildFeedModificationRequestMapsSupportedArguments(t *testing.T) {
+	req := buildFeedModificationRequest(map[string]interface{}{
+		"feed_url":                       "https://example.com/feed.xml",
+		"site_url":                       "https://example.com",
+		"title":                          "Example",
+		"scraper_rules":                  "article",
+		"rewrite_rules":                  "rewrite",
+		"urlrewrite_rules":               "url rewrite",
+		"blocklist_rules":                "block",
+		"keeplist_rules":                 "keep",
+		"block_filter_entry_rules":       "entry block",
+		"keep_filter_entry_rules":        "entry keep",
+		"crawler":                        true,
+		"ignore_entry_updates":           true,
+		"user_agent":                     "Agent",
+		"cookie":                         "k=v",
+		"username":                       "user",
+		"password":                       "pass",
+		"category_id":                    float64(7),
+		"disabled":                       true,
+		"ignore_http_cache":              true,
+		"allow_self_signed_certificates": true,
+		"fetch_via_proxy":                true,
+		"hide_globally":                  true,
+		"disable_http2":                  true,
+		"proxy_url":                      "socks5://localhost:1080",
+	})
+
+	if req.FeedURL == nil || *req.FeedURL != "https://example.com/feed.xml" {
+		t.Fatalf("FeedURL = %#v, want feed URL", req.FeedURL)
+	}
+	if req.SiteURL == nil || *req.SiteURL != "https://example.com" {
+		t.Fatalf("SiteURL = %#v, want site URL", req.SiteURL)
+	}
+	if req.Title == nil || *req.Title != "Example" {
+		t.Fatalf("Title = %#v, want Example", req.Title)
+	}
+	if req.CategoryID == nil || *req.CategoryID != 7 {
+		t.Fatalf("CategoryID = %#v, want 7", req.CategoryID)
+	}
+	if req.Crawler == nil || !*req.Crawler || req.Disabled == nil || !*req.Disabled {
+		t.Fatalf("Crawler/Disabled not mapped")
+	}
+	if req.ProxyURL == nil || *req.ProxyURL != "socks5://localhost:1080" {
+		t.Fatalf("ProxyURL = %#v, want proxy URL", req.ProxyURL)
+	}
+}
+
+func TestBuildEntryModificationRequestMapsSupportedArguments(t *testing.T) {
+	req := buildEntryModificationRequest(map[string]interface{}{
+		"title":   "New title",
+		"content": "New content",
+	})
+
+	if req.Title == nil || *req.Title != "New title" {
+		t.Fatalf("Title = %#v, want New title", req.Title)
+	}
+	if req.Content == nil || *req.Content != "New content" {
+		t.Fatalf("Content = %#v, want New content", req.Content)
+	}
+}
+
+func TestBuildImportFeedEntryPayloadMapsSupportedArguments(t *testing.T) {
+	payload := buildImportFeedEntryPayload(map[string]interface{}{
+		"url":          "https://example.com/article",
+		"title":        "Entry",
+		"author":       "Author",
+		"content":      "<p>Content</p>",
+		"published_at": float64(1736200000),
+		"status":       "unread",
+		"starred":      true,
+		"tags":         []interface{}{"go", "rss"},
+		"external_id":  "unique-id",
+		"comments_url": "https://example.com/article#comments",
+	})
+
+	if payload["url"] != "https://example.com/article" || payload["title"] != "Entry" {
+		t.Fatalf("payload URL/title not mapped: %#v", payload)
+	}
+	if payload["published_at"] != int64(1736200000) {
+		t.Fatalf("published_at = %#v, want int64 timestamp", payload["published_at"])
+	}
+	if payload["starred"] != true {
+		t.Fatalf("starred = %#v, want true", payload["starred"])
+	}
+	tags, ok := payload["tags"].([]string)
+	if !ok || len(tags) != 2 || tags[0] != "go" || tags[1] != "rss" {
+		t.Fatalf("tags = %#v, want go/rss", payload["tags"])
+	}
+}

@@ -97,6 +97,44 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 		},
 		{
 			Tool: mcp.Tool{
+				Name:        "update_feed",
+				Description: "Update a feed",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"feed_id":                        map[string]interface{}{"type": "number", "description": "The ID of the feed"},
+						"feed_url":                       map[string]interface{}{"type": "string", "description": "Feed URL"},
+						"site_url":                       map[string]interface{}{"type": "string", "description": "Site URL"},
+						"title":                          map[string]interface{}{"type": "string", "description": "Feed title"},
+						"scraper_rules":                  map[string]interface{}{"type": "string", "description": "Scraper rules"},
+						"rewrite_rules":                  map[string]interface{}{"type": "string", "description": "Rewrite rules"},
+						"urlrewrite_rules":               map[string]interface{}{"type": "string", "description": "URL rewrite rules"},
+						"blocklist_rules":                map[string]interface{}{"type": "string", "description": "Blocklist rules"},
+						"keeplist_rules":                 map[string]interface{}{"type": "string", "description": "Keeplist rules"},
+						"block_filter_entry_rules":       map[string]interface{}{"type": "string", "description": "Entry block filter rules"},
+						"keep_filter_entry_rules":        map[string]interface{}{"type": "string", "description": "Entry keep filter rules"},
+						"crawler":                        map[string]interface{}{"type": "boolean", "description": "Enable web scraper"},
+						"ignore_entry_updates":           map[string]interface{}{"type": "boolean", "description": "Ignore entry updates"},
+						"user_agent":                     map[string]interface{}{"type": "string", "description": "Custom user agent"},
+						"cookie":                         map[string]interface{}{"type": "string", "description": "HTTP cookie"},
+						"username":                       map[string]interface{}{"type": "string", "description": "HTTP basic auth username"},
+						"password":                       map[string]interface{}{"type": "string", "description": "HTTP basic auth password"},
+						"category_id":                    map[string]interface{}{"type": "number", "description": "Category ID"},
+						"disabled":                       map[string]interface{}{"type": "boolean", "description": "Disable feed refresh"},
+						"ignore_http_cache":              map[string]interface{}{"type": "boolean", "description": "Ignore HTTP cache"},
+						"allow_self_signed_certificates": map[string]interface{}{"type": "boolean", "description": "Allow self-signed certificates"},
+						"fetch_via_proxy":                map[string]interface{}{"type": "boolean", "description": "Fetch via configured proxy"},
+						"hide_globally":                  map[string]interface{}{"type": "boolean", "description": "Hide entries from global views"},
+						"disable_http2":                  map[string]interface{}{"type": "boolean", "description": "Disable HTTP/2"},
+						"proxy_url":                      map[string]interface{}{"type": "string", "description": "Per-feed proxy URL"},
+					},
+					Required: []string{"feed_id"},
+				},
+			},
+			Handler: s.UpdateFeed,
+		},
+		{
+			Tool: mcp.Tool{
 				Name:        "refresh_feed",
 				Description: "Manually refresh a specific feed",
 				InputSchema: mcp.ToolInputSchema{
@@ -172,6 +210,34 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				},
 			},
 			Handler: s.GetFeedEntry,
+		},
+		{
+			Tool: mcp.Tool{
+				Name:        "import_feed_entry",
+				Description: "Import an entry into a feed",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"feed_id":      map[string]interface{}{"type": "number", "description": "The ID of the feed"},
+						"url":          map[string]interface{}{"type": "string", "description": "Entry URL"},
+						"title":        map[string]interface{}{"type": "string", "description": "Entry title"},
+						"author":       map[string]interface{}{"type": "string", "description": "Entry author"},
+						"content":      map[string]interface{}{"type": "string", "description": "Entry content"},
+						"published_at": map[string]interface{}{"type": "number", "description": "Published Unix timestamp"},
+						"status":       map[string]interface{}{"type": "string", "description": "Entry status"},
+						"starred":      map[string]interface{}{"type": "boolean", "description": "Whether the entry is starred"},
+						"tags": map[string]interface{}{
+							"type":        "array",
+							"description": "Entry tags",
+							"items":       map[string]interface{}{"type": "string"},
+						},
+						"external_id":  map[string]interface{}{"type": "string", "description": "External unique ID"},
+						"comments_url": map[string]interface{}{"type": "string", "description": "Comments URL"},
+					},
+					Required: []string{"feed_id", "url"},
+				},
+			},
+			Handler: s.ImportFeedEntry,
 		},
 		{
 			Tool: mcp.Tool{
@@ -355,6 +421,22 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				},
 			},
 			Handler: s.ToggleStarred,
+		},
+		{
+			Tool: mcp.Tool{
+				Name:        "update_entry",
+				Description: "Update entry title or content",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"entry_id": map[string]interface{}{"type": "number", "description": "The ID of the entry"},
+						"title":    map[string]interface{}{"type": "string", "description": "Entry title"},
+						"content":  map[string]interface{}{"type": "string", "description": "Entry content"},
+					},
+					Required: []string{"entry_id"},
+				},
+			},
+			Handler: s.UpdateEntry,
 		},
 		{
 			Tool: mcp.Tool{
@@ -709,6 +791,17 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 		},
 		{
 			Tool: mcp.Tool{
+				Name:        "get_integrations_status",
+				Description: "Get integrations status for the signed-in user",
+				InputSchema: mcp.ToolInputSchema{
+					Type:       "object",
+					Properties: map[string]interface{}{},
+				},
+			},
+			Handler: s.GetIntegrationsStatus,
+		},
+		{
+			Tool: mcp.Tool{
 				Name:        "discover",
 				Description: "Discover feeds from a URL",
 				InputSchema: mcp.ToolInputSchema{
@@ -828,6 +921,21 @@ func (s *MinifluxServer) RegisterAllTools(mcpServer *server.MCPServer) {
 				},
 			},
 			Handler: s.GetEnclosure,
+		},
+		{
+			Tool: mcp.Tool{
+				Name:        "update_enclosure",
+				Description: "Update enclosure media progression",
+				InputSchema: mcp.ToolInputSchema{
+					Type: "object",
+					Properties: map[string]interface{}{
+						"enclosure_id":      map[string]interface{}{"type": "number", "description": "The ID of the enclosure"},
+						"media_progression": map[string]interface{}{"type": "number", "description": "Media progression in seconds"},
+					},
+					Required: []string{"enclosure_id", "media_progression"},
+				},
+			},
+			Handler: s.UpdateEnclosure,
 		},
 	}
 

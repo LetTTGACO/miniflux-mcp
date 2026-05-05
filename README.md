@@ -91,10 +91,12 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `get_feed` - Get a specific feed by ID
 - `create_feed` - Add a new RSS/Atom feed
 - `delete_feed` - Delete a specific feed
+- `update_feed` - Update feed settings
 - `refresh_feed` - Manually refresh a specific feed
 - `refresh_all_feeds` - Refresh all feeds
 - `get_feed_entries` - Get entries from a specific feed
 - `get_feed_entry` - Get a specific entry from a feed
+- `import_feed_entry` - Import an entry into a feed
 - `get_feed_icon` - Get the icon of a specific feed
 - `mark_feed_as_read` - Mark all entries in a feed as read
 
@@ -103,6 +105,7 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
 - `toggle_starred` - Toggle starred status of an entry
+- `update_entry` - Update entry title or content
 - `save_entry` - Save an entry
 - `fetch_original_content` - Fetch original content of an entry
 - `mark_all_as_read` - Mark all entries as read for a user
@@ -130,6 +133,7 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 - `get_version` - Get Miniflux version information
 - `healthcheck` - Perform a health check
 - `fetch_counters` - Fetch feed counters
+- `get_integrations_status` - Get integrations status
 - `discover` - Discover feeds from a URL
 - `export` - Export feeds as OPML
 - `flush_history` - Flush the read history
@@ -142,6 +146,7 @@ The Miniflux MCP Server provides **40+ tools** covering all Miniflux API functio
 ### Icons & Media (2 tools)
 - `get_icon` - Get an icon by ID
 - `get_enclosure` - Get an enclosure by ID
+- `update_enclosure` - Update enclosure media progression
 
 ## License
 

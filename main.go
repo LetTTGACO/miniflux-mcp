@@ -169,6 +169,92 @@ func buildEntryFilter(args map[string]interface{}) *client.Filter {
 	return filter
 }
 
+func buildFeedModificationRequest(args map[string]interface{}) *client.FeedModificationRequest {
+	request := &client.FeedModificationRequest{}
+
+	setStringPtr(args, "feed_url", &request.FeedURL)
+	setStringPtr(args, "site_url", &request.SiteURL)
+	setStringPtr(args, "title", &request.Title)
+	setStringPtr(args, "scraper_rules", &request.ScraperRules)
+	setStringPtr(args, "rewrite_rules", &request.RewriteRules)
+	setStringPtr(args, "urlrewrite_rules", &request.UrlRewriteRules)
+	setStringPtr(args, "blocklist_rules", &request.BlocklistRules)
+	setStringPtr(args, "keeplist_rules", &request.KeeplistRules)
+	setStringPtr(args, "block_filter_entry_rules", &request.BlockFilterEntryRules)
+	setStringPtr(args, "keep_filter_entry_rules", &request.KeepFilterEntryRules)
+	setBoolPtr(args, "crawler", &request.Crawler)
+	setBoolPtr(args, "ignore_entry_updates", &request.IgnoreEntryUpdates)
+	setStringPtr(args, "user_agent", &request.UserAgent)
+	setStringPtr(args, "cookie", &request.Cookie)
+	setStringPtr(args, "username", &request.Username)
+	setStringPtr(args, "password", &request.Password)
+	setInt64Ptr(args, "category_id", &request.CategoryID)
+	setBoolPtr(args, "disabled", &request.Disabled)
+	setBoolPtr(args, "ignore_http_cache", &request.IgnoreHTTPCache)
+	setBoolPtr(args, "allow_self_signed_certificates", &request.AllowSelfSignedCertificates)
+	setBoolPtr(args, "fetch_via_proxy", &request.FetchViaProxy)
+	setBoolPtr(args, "hide_globally", &request.HideGlobally)
+	setBoolPtr(args, "disable_http2", &request.DisableHTTP2)
+	setStringPtr(args, "proxy_url", &request.ProxyURL)
+
+	return request
+}
+
+func buildEntryModificationRequest(args map[string]interface{}) *client.EntryModificationRequest {
+	request := &client.EntryModificationRequest{}
+
+	setStringPtr(args, "title", &request.Title)
+	setStringPtr(args, "content", &request.Content)
+
+	return request
+}
+
+func buildImportFeedEntryPayload(args map[string]interface{}) map[string]interface{} {
+	payload := map[string]interface{}{}
+
+	for _, key := range []string{"title", "url", "author", "content", "status", "external_id", "comments_url"} {
+		if value, ok := args[key].(string); ok {
+			payload[key] = value
+		}
+	}
+	if publishedAt, ok := args["published_at"].(float64); ok {
+		payload["published_at"] = int64(publishedAt)
+	}
+	if starred, ok := args["starred"].(bool); ok {
+		payload["starred"] = starred
+	}
+	if tags, ok := args["tags"].([]interface{}); ok {
+		tagStrings := make([]string, 0, len(tags))
+		for _, tag := range tags {
+			if tagString, ok := tag.(string); ok {
+				tagStrings = append(tagStrings, tagString)
+			}
+		}
+		payload["tags"] = tagStrings
+	}
+
+	return payload
+}
+
+func setStringPtr(args map[string]interface{}, key string, dest **string) {
+	if value, ok := args[key].(string); ok {
+		*dest = &value
+	}
+}
+
+func setBoolPtr(args map[string]interface{}, key string, dest **bool) {
+	if value, ok := args[key].(bool); ok {
+		*dest = &value
+	}
+}
+
+func setInt64Ptr(args map[string]interface{}, key string, dest **int64) {
+	if value, ok := args[key].(float64); ok {
+		intValue := int64(value)
+		*dest = &intValue
+	}
+}
+
 func (s *MinifluxServer) GetEntry(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	args := request.Params.Arguments
 	if args == nil {
