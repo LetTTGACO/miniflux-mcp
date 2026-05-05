@@ -12,7 +12,7 @@ Add two high-level MCP tools for AI clients: one to fetch Miniflux entries for a
 
 ## Content Handling
 
-`get_daily_digest` returns structured JSON with entry metadata and optional content as returned by Miniflux. It supports:
+`get_daily_digest` returns structured JSON with entry metadata and optional content as returned by Miniflux. It must not clean, summarize, rewrite, strip HTML, decode entities, or otherwise transform article content. It supports:
 
 - `content_mode=none`: metadata only.
 - `content_mode=feed`: use the feed-provided entry content. This is the default.
@@ -23,7 +23,7 @@ Returned content is truncated to `max_content_length` per entry. The tool return
 
 ## Boundaries
 
-The MCP server does not summarize news, decide timezones, calculate daily boundaries, or record push delivery state. The AI client owns summarization, delivery formatting, date-window policy, and delivery logs. This server owns Miniflux reads, optional original-content fetches, and status changes.
+The MCP server does not summarize news, decide timezones, calculate daily boundaries, clean article content, or record push delivery state. The AI client owns summarization, delivery formatting, content cleanup, date-window policy, and delivery logs. This server owns Miniflux reads, optional original-content fetches, truncation for payload size, and status changes.
 
 ## Verification
 

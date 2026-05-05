@@ -4,7 +4,7 @@
 
 **Goal:** Add digest-window entry retrieval and batch entry status updates for AI clients.
 
-**Architecture:** Follow the existing MCP tool pattern: define schemas in `tools.go`, handlers in `main.go` or `handlers.go`, helper functions near entry filtering, and HTTP-backed behavior tests in `main_test.go`. Keep summarization, timezone policy, and delivery logs outside this MCP server.
+**Architecture:** Follow the existing MCP tool pattern: define schemas in `tools.go`, handlers in `main.go` or `handlers.go`, helper functions near entry filtering, and HTTP-backed behavior tests in `main_test.go`. Keep summarization, content cleanup, timezone policy, and delivery logs outside this MCP server.
 
 **Tech Stack:** Go, `miniflux.app/v2 v2.2.19`, mark3labs MCP Go SDK, standard `go test` HTTP test server.
 
@@ -35,6 +35,7 @@
 - [ ] Add failing tests for `content_mode` values, explicit scrape behavior, returned Miniflux content, and truncation metadata.
 - [ ] Add the tool schema with `since`, `status`, `date_field`, `limit`, `content_mode`, `min_content_length`, and `max_content_length`.
 - [ ] Implement digest request building and response shaping.
+- [ ] Verify the digest tool does not expose content-cleaning options such as HTML stripping, entity decoding, or text formatting.
 - [ ] Run focused tests and commit.
 
 ### Task 3: Full Verification
