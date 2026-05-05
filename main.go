@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -16,43 +18,62 @@ type MinifluxServer struct {
 	client *client.Client
 }
 
-func NewMinifluxServer() *MinifluxServer {
-	// Get configuration from environment variables
-	baseURL := os.Getenv("MINIFLUX_URL")
-	if baseURL == "" {
-		log.Fatal("MINIFLUX_URL environment variable is required")
-	}
+const minifluxStartupTimeout = 10 * time.Second
 
+func NewMinifluxServer() *MinifluxServer {
+	baseURL := os.Getenv("MINIFLUX_URL")
 	apiKey := os.Getenv("MINIFLUX_API_KEY")
 	username := os.Getenv("MINIFLUX_USERNAME")
 	password := os.Getenv("MINIFLUX_PASSWORD")
 
-	if apiKey == "" && (username == "" || password == "") {
-		log.Fatal("Either MINIFLUX_API_KEY or both MINIFLUX_USERNAME and MINIFLUX_PASSWORD must be set")
+	server, err := newMinifluxServerFromConfig(baseURL, apiKey, username, password, minifluxStartupTimeout, nil)
+	if err != nil {
+		log.Fatal(err)
 	}
 
+	return server
+}
+
+func newMinifluxServerFromConfig(baseURL, apiKey, username, password string, startupTimeout time.Duration, httpClient *http.Client) (*MinifluxServer, error) {
+	if baseURL == "" {
+		return nil, fmt.Errorf("MINIFLUX_URL environment variable is required")
+	}
+	if apiKey == "" && (username == "" || password == "") {
+		return nil, fmt.Errorf("either MINIFLUX_API_KEY or both MINIFLUX_USERNAME and MINIFLUX_PASSWORD must be set")
+	}
+
+	if startupTimeout <= 0 {
+		startupTimeout = minifluxStartupTimeout
+	}
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: startupTimeout}
+	}
+
+	options := []client.Option{client.WithHTTPClient(httpClient)}
 	var minifluxClient *client.Client
 	if apiKey != "" {
-		minifluxClient = client.NewClient(baseURL, apiKey)
+		options = append(options, client.WithAPIKey(apiKey))
 	} else {
-		minifluxClient = client.NewClient(baseURL, username, password)
+		options = append(options, client.WithCredentials(username, password))
 	}
+	minifluxClient = client.NewClientWithOptions(baseURL, options...)
 
-	err := minifluxClient.Healthcheck()
-	if err != nil {
-		log.Fatalf("Healthcheck failed: %v", err)
+	ctx, cancel := context.WithTimeout(context.Background(), startupTimeout)
+	defer cancel()
+
+	if err := minifluxClient.HealthcheckContext(ctx); err != nil {
+		return nil, fmt.Errorf("healthcheck failed: %w", err)
 	}
 	log.Printf("Healthcheck passed")
 
-	_, err = minifluxClient.Me()
-	if err != nil {
-		log.Fatalf("Auth failed: %v", err)
+	if _, err := minifluxClient.MeContext(ctx); err != nil {
+		return nil, fmt.Errorf("auth failed: %w", err)
 	}
 	log.Printf("Auth passed")
 
 	return &MinifluxServer{
 		client: minifluxClient,
-	}
+	}, nil
 }
 
 func (s *MinifluxServer) GetFeeds(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

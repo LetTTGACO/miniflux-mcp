@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"miniflux.app/v2/client"
@@ -85,6 +86,60 @@ func TestImportOPMLRequiresContent(t *testing.T) {
 	}
 	if !result.IsError {
 		t.Fatalf("ImportOPML IsError = false, want true")
+	}
+}
+
+func TestNewMinifluxServerFromConfigChecksStartupWithDeadline(t *testing.T) {
+	requestedPaths := []string{}
+	timeout := 250 * time.Millisecond
+
+	httpClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			deadline, ok := req.Context().Deadline()
+			if !ok {
+				t.Fatalf("request to %s has no context deadline", req.URL.Path)
+			}
+			if time.Until(deadline) > timeout {
+				t.Fatalf("deadline for %s exceeds startup timeout", req.URL.Path)
+			}
+
+			requestedPaths = append(requestedPaths, req.URL.Path)
+			switch req.URL.Path {
+			case "/healthcheck":
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString("OK")),
+					Header:     http.Header{},
+				}, nil
+			case "/v1/me":
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewBufferString(`{"id":1,"username":"tester"}`)),
+					Header:     http.Header{},
+				}, nil
+			default:
+				t.Fatalf("unexpected path: %s", req.URL.Path)
+			}
+			return nil, nil
+		}),
+	}
+
+	server, err := newMinifluxServerFromConfig("http://mf", "api-key", "", "", timeout, httpClient)
+	if err != nil {
+		t.Fatalf("newMinifluxServerFromConfig returned error: %v", err)
+	}
+	if server == nil || server.client == nil {
+		t.Fatalf("server/client is nil")
+	}
+	if len(requestedPaths) != 2 || requestedPaths[0] != "/healthcheck" || requestedPaths[1] != "/v1/me" {
+		t.Fatalf("requested paths = %#v, want healthcheck then me", requestedPaths)
+	}
+}
+
+func TestNewMinifluxServerFromConfigRequiresCredentials(t *testing.T) {
+	_, err := newMinifluxServerFromConfig("http://mf", "", "", "", time.Second, nil)
+	if err == nil {
+		t.Fatalf("error = nil, want missing credentials error")
 	}
 }
 
