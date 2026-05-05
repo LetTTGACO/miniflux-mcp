@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +22,8 @@ type MinifluxServer struct {
 }
 
 const minifluxStartupTimeout = 10 * time.Second
+
+var htmlTagRe = regexp.MustCompile(`<[^>]+>`)
 
 type dailyDigestResponse struct {
 	GeneratedAt time.Time          `json:"generated_at"`
@@ -296,6 +300,7 @@ type dailyDigestOptions struct {
 	dateField        string
 	limit            int
 	contentMode      string
+	contentFormat    string
 	minContentLength int
 	maxContentLength int
 }
@@ -306,6 +311,7 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 		dateField:        "published",
 		limit:            50,
 		contentMode:      "feed",
+		contentFormat:    "raw",
 		minContentLength: 500,
 		maxContentLength: 6000,
 		now:              time.Now(),
@@ -349,6 +355,14 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	if maxContentLength, ok := numberArg(args, "max_content_length"); ok {
 		options.maxContentLength = int(maxContentLength)
 	}
+	if contentFormat, ok := args["content_format"].(string); ok && contentFormat != "" {
+		switch contentFormat {
+		case "raw", "text":
+			options.contentFormat = contentFormat
+		default:
+			return options, fmt.Errorf("content_format must be raw or text")
+		}
+	}
 
 	return options, nil
 }
@@ -381,6 +395,9 @@ func (s *MinifluxServer) buildDailyDigestEntry(entry *client.Entry, options dail
 	digestEntry.ContentError = contentErr
 	digestEntry.ContentAvailable = strings.TrimSpace(content) != ""
 
+	if options.contentFormat == "text" {
+		content = htmlToText(content)
+	}
 	content, truncated := truncateContent(content, options.maxContentLength)
 	digestEntry.Content = content
 	digestEntry.ContentLength = len(content)
@@ -412,6 +429,11 @@ func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDi
 	default:
 		return entry.Content, "feed", ""
 	}
+}
+
+func htmlToText(content string) string {
+	withoutTags := htmlTagRe.ReplaceAllString(content, " ")
+	return strings.Join(strings.Fields(html.UnescapeString(withoutTags)), " ")
 }
 
 func truncateContent(content string, maxLength int) (string, bool) {
