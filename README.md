@@ -100,7 +100,7 @@ The Miniflux MCP Server provides **49 tools** covering Miniflux API functionalit
 - `get_feed_icon` - Get the icon of a specific feed
 - `mark_feed_as_read` - Mark all entries in a feed as read
 
-### Entry Management (9 tools)
+### Entry Management (8 tools)
 - `get_entries` - Get entries with optional filtering
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
@@ -109,15 +109,15 @@ The Miniflux MCP Server provides **49 tools** covering Miniflux API functionalit
 - `save_entry` - Save an entry
 - `fetch_original_content` - Fetch original content of an entry
 - `mark_all_as_read` - Mark all entries as read for a user
-- `get_category_entry` - Get a specific entry from a category
 
-### Category Management (8 tools)
+### Category Management (9 tools)
 - `get_categories` - Get all feed categories
 - `create_category` - Create a new category
 - `update_category` - Update a category title
 - `delete_category` - Delete a category
 - `get_category_feeds` - Get all feeds in a specific category
 - `get_category_entries` - Get all entries in a specific category
+- `get_category_entry` - Get a specific entry from a category
 - `mark_category_as_read` - Mark all entries in a category as read
 - `refresh_category` - Refresh all feeds in a category
 
