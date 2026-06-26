@@ -281,16 +281,20 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 		Status:      options.status,
 		DateField:   options.dateField,
 		Total:       entries.Total,
-		Count:       len(entries.Entries),
+		Count:       0,
 		AckEntryIDs: make([]int64, 0, len(entries.Entries)),
 		Entries:     make([]dailyDigestEntry, 0, len(entries.Entries)),
 	}
 
 	for _, entry := range entries.Entries {
+		if !includeDigestEntry(entry, options) {
+			continue
+		}
 		digestEntry := s.buildDailyDigestEntry(entry, options)
 		response.AckEntryIDs = append(response.AckEntryIDs, entry.ID)
 		response.Entries = append(response.Entries, digestEntry)
 	}
+	response.Count = len(response.Entries)
 
 	digestJSON, err := json.MarshalIndent(response, "", "  ")
 	if err != nil {
@@ -415,6 +419,38 @@ func (s *MinifluxServer) buildDailyDigestEntry(entry *client.Entry, options dail
 	digestEntry.ContentTruncated = truncated
 
 	return digestEntry
+}
+
+func includeDigestEntry(entry *client.Entry, options dailyDigestOptions) bool {
+	categoryID, ok := entryCategoryID(entry)
+	if !ok {
+		return len(options.categoryIDs) == 0
+	}
+
+	if len(options.categoryIDs) > 0 && !containsInt64(options.categoryIDs, categoryID) {
+		return false
+	}
+	if containsInt64(options.excludeCategoryIDs, categoryID) {
+		return false
+	}
+
+	return true
+}
+
+func entryCategoryID(entry *client.Entry) (int64, bool) {
+	if entry.Feed == nil || entry.Feed.Category == nil {
+		return 0, false
+	}
+	return entry.Feed.Category.ID, true
+}
+
+func containsInt64(values []int64, target int64) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *MinifluxServer) digestEntryContent(entry *client.Entry, options dailyDigestOptions) (string, string, string) {
