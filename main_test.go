@@ -457,6 +457,110 @@ func TestBuildDailyDigestOptionsParsesCategoryFilters(t *testing.T) {
 	}
 }
 
+func TestGetDailyDigestFiltersIncludedAndExcludedCategories(t *testing.T) {
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != "/v1/entries" {
+						t.Fatalf("path = %s, want /v1/entries", req.URL.Path)
+					}
+					if got := req.URL.Query().Get("category_id"); got != "" {
+						t.Fatalf("category_id query = %q, want empty because filtering is local", got)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"total": 3,
+							"entries": [
+								{"id": 11, "title": "One", "url": "https://example.com/1", "status": "unread", "feed_id": 1, "feed": {"id": 1, "title": "Feed 1", "category": {"id": 1, "title": "Keep"}}},
+								{"id": 12, "title": "Two", "url": "https://example.com/2", "status": "unread", "feed_id": 2, "feed": {"id": 2, "title": "Feed 2", "category": {"id": 2, "title": "Keep Too"}}},
+								{"id": 14, "title": "Four", "url": "https://example.com/4", "status": "unread", "feed_id": 4, "feed": {"id": 4, "title": "Feed 4", "category": {"id": 4, "title": "Drop"}}}
+							]
+						}`)),
+						Header: http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+
+	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
+			"since":                float64(1777910400),
+			"category_ids":         []interface{}{float64(1), float64(2), float64(4)},
+			"exclude_category_ids": []interface{}{float64(4)},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("handler returned transport error: %v", err)
+	}
+	if result == nil || result.IsError {
+		t.Fatalf("result = %#v, want non-error", result)
+	}
+
+	var response dailyDigestResponse
+	unmarshalToolResultText(t, result, &response)
+	if response.Total != 3 {
+		t.Fatalf("total = %d, want upstream total 3", response.Total)
+	}
+	if response.Count != 2 {
+		t.Fatalf("count = %d, want locally filtered count 2", response.Count)
+	}
+	if !sameInt64Set(response.AckEntryIDs, []int64{11, 12}) {
+		t.Fatalf("ack_entry_ids = %#v, want [11 12]", response.AckEntryIDs)
+	}
+}
+
+func TestGetDailyDigestExcludesCategoriesWithoutIncludeFilter(t *testing.T) {
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != "/v1/entries" {
+						t.Fatalf("path = %s, want /v1/entries", req.URL.Path)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"total": 2,
+							"entries": [
+								{"id": 21, "title": "News", "url": "https://example.com/news", "status": "unread", "feed_id": 1, "feed": {"id": 1, "title": "News Feed", "category": {"id": 1, "title": "News"}}},
+								{"id": 22, "title": "Social", "url": "https://example.com/social", "status": "unread", "feed_id": 2, "feed": {"id": 2, "title": "Social Feed", "category": {"id": 4, "title": "Social"}}}
+							]
+						}`)),
+						Header: http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
+
+	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
+			"since":                float64(1777910400),
+			"exclude_category_ids": []interface{}{float64(4)},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("handler returned transport error: %v", err)
+	}
+	if result == nil || result.IsError {
+		t.Fatalf("result = %#v, want non-error", result)
+	}
+
+	var response dailyDigestResponse
+	unmarshalToolResultText(t, result, &response)
+	if response.Count != 1 {
+		t.Fatalf("count = %d, want 1", response.Count)
+	}
+	if !sameInt64Set(response.AckEntryIDs, []int64{21}) {
+		t.Fatalf("ack_entry_ids = %#v, want [21]", response.AckEntryIDs)
+	}
+}
+
 func TestEntryFilterSchemaMatchesSupportedArguments(t *testing.T) {
 	properties := entryFilterProperties()
 	filter := buildEntryFilter(map[string]interface{}{
