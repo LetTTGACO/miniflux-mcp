@@ -35,6 +35,7 @@ When updating docs, verify both the total count and every group count against `m
 `get_daily_digest` and `update_entries_status` are high-level tools for AI clients, but this server should stay a Miniflux MCP server rather than a summarizer or delivery system.
 
 - `get_daily_digest` must require a caller-provided `since` value; the server must not choose a timezone, daily boundary, or schedule.
+- `get_daily_digest` uses `category_ids` for optional multi-category inclusion and `exclude_category_ids` for exclusion. Do not reintroduce the old single `category_id` argument for this tool unless explicitly requested.
 - Keep digest content modes limited to Miniflux-backed content retrieval: `none`, `feed`, `scrape_when_short`, and `scrape_all`.
 - Do not add article cleanup, summarization, push delivery, or delivery logs to this server.
 - The digest response should keep acknowledgement metadata such as `ack_entry_ids` so clients can call `update_entries_status` only after their downstream processing succeeds.

@@ -4,6 +4,8 @@
 
 **Goal:** Replace `get_daily_digest`'s single `category_id` input with `category_ids` and add `exclude_category_ids` filtering.
 
+**Status:** Completed. The implementation uses local category filtering, updates README, and passes Go test/build/vet verification. Docker verification was blocked locally because the Docker/OrbStack socket was unavailable.
+
 **Architecture:** Keep Miniflux API querying bounded by the existing time, status, feed, limit, and order filters. Apply multi-category include/exclude filtering locally before building digest response entries and acknowledgement IDs, because the pinned Miniflux Go client only exposes a single `CategoryID` filter.
 
 **Tech Stack:** Go 1.26, `github.com/mark3labs/mcp-go`, `miniflux.app/v2 v2.2.19`, standard `testing` package.
@@ -432,7 +434,7 @@ with:
 ```markdown
 - `feed_id` optionally scopes the digest to one feed.
 - `category_ids` optionally scopes the digest to multiple categories.
-- `exclude_category_ids` removes categories from the digest after `category_ids` is applied. When both are present, the effective category set is `category_ids - exclude_category_ids`.
+- `exclude_category_ids` removes categories from the digest after `category_ids` is applied. If `category_ids` is omitted or empty, the digest starts from all categories before applying `exclude_category_ids`. When both are present, the effective category set is `category_ids - exclude_category_ids`.
 ```
 
 - [ ] **Step 3: Run tests**
