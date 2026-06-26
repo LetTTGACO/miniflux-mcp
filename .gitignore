@@ -58,3 +58,4 @@ temp/
 
 # Docker
 docker-compose.override.yml
+.superpowers
