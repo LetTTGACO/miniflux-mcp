@@ -419,6 +419,44 @@ func TestGetDailyDigestRequiresSince(t *testing.T) {
 	assertToolErrorContains(t, result, "since is required")
 }
 
+func TestGetDailyDigestCategoryFilterSchema(t *testing.T) {
+	tool := toolDefinitionByName(t, "get_daily_digest")
+
+	if _, ok := tool.InputSchema.Properties["category_id"]; ok {
+		t.Fatalf("get_daily_digest schema must not expose category_id")
+	}
+	for _, property := range []string{"category_ids", "exclude_category_ids"} {
+		schema, ok := tool.InputSchema.Properties[property]
+		if !ok {
+			t.Fatalf("get_daily_digest schema is missing %s", property)
+		}
+		schemaMap, ok := schema.(map[string]interface{})
+		if !ok {
+			t.Fatalf("%s schema = %#v, want object", property, schema)
+		}
+		if schemaMap["type"] != "array" {
+			t.Fatalf("%s type = %#v, want array", property, schemaMap["type"])
+		}
+	}
+}
+
+func TestBuildDailyDigestOptionsParsesCategoryFilters(t *testing.T) {
+	options, err := buildDailyDigestOptions(map[string]interface{}{
+		"since":                float64(1777910400),
+		"category_ids":         []interface{}{float64(1), float64(2), float64(4)},
+		"exclude_category_ids": []interface{}{float64(4)},
+	})
+	if err != nil {
+		t.Fatalf("buildDailyDigestOptions returned error: %v", err)
+	}
+	if !sameInt64Set(options.categoryIDs, []int64{1, 2, 4}) {
+		t.Fatalf("categoryIDs = %#v, want [1 2 4]", options.categoryIDs)
+	}
+	if !sameInt64Set(options.excludeCategoryIDs, []int64{4}) {
+		t.Fatalf("excludeCategoryIDs = %#v, want [4]", options.excludeCategoryIDs)
+	}
+}
+
 func TestEntryFilterSchemaMatchesSupportedArguments(t *testing.T) {
 	properties := entryFilterProperties()
 	filter := buildEntryFilter(map[string]interface{}{
@@ -513,6 +551,23 @@ func sameStringSet(a, b []string) bool {
 		return false
 	}
 	seen := make(map[string]int, len(a))
+	for _, value := range a {
+		seen[value]++
+	}
+	for _, value := range b {
+		seen[value]--
+		if seen[value] < 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func sameInt64Set(a, b []int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := make(map[int64]int, len(a))
 	for _, value := range a {
 		seen[value]++
 	}
