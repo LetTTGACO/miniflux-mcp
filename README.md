@@ -43,7 +43,7 @@ docker run --env-file .env miniflux-mcp
 ```bash
 # Setup .env file
 # Run
-docker run -i --rm --env-file .env letttgaco/miniflux-mcp:latest
+docker run -i --rm --name miniflux-mcp --env-file .env letttgaco/miniflux-mcp:latest
 ```
 
 ### Docker Hub Release Workflow
@@ -82,6 +82,8 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
         "run",
         "-i",
         "--rm",
+        "--name",
+        "miniflux-mcp",
         "-e",
         "MINIFLUX_URL",
         "-e",
@@ -99,6 +101,125 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
   }
 }
 ```
+
+Or register it with the Claude Code CLI (`--transport stdio` is the default and may be omitted):
+
+```bash
+claude mcp add miniflux \
+  -e MINIFLUX_URL=https://your-miniflux-instance.com \
+  -e MINIFLUX_API_KEY=your_api_key_here \
+  -- docker run -i --rm --name miniflux-mcp letttgaco/miniflux-mcp:latest
+```
+
+Add `-s user` to register at user scope (available across all your projects) instead of the default local scope.
+
+### Integration with Codex CLI
+
+To use this MCP server with Codex CLI, add the following to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.miniflux]
+command = "docker"
+args = [
+  "run",
+  "-i",
+  "--rm",
+  "--name",
+  "miniflux-mcp",
+  "-e",
+  "MINIFLUX_URL",
+  "-e",
+  "MINIFLUX_API_KEY",
+  "letttgaco/miniflux-mcp:latest",
+]
+
+[mcp_servers.miniflux.env]
+MINIFLUX_URL = "https://your-miniflux-instance.com"
+MINIFLUX_API_KEY = "your_api_key_here"
+# Or use username/password instead of API key
+# MINIFLUX_USERNAME = "your_username_here"
+# MINIFLUX_PASSWORD = "your_password_here"
+```
+
+### Integration with OpenClaw
+
+OpenClaw manages outbound MCP servers under `mcp.servers` in its config file (for example `~/.openclaw/openclaw.json`). Add the following server definition:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "miniflux": {
+        "command": "docker",
+        "args": [
+          "run",
+          "-i",
+          "--rm",
+          "--name",
+          "miniflux-mcp",
+          "-e",
+          "MINIFLUX_URL",
+          "-e",
+          "MINIFLUX_API_KEY",
+          "letttgaco/miniflux-mcp:latest"
+        ],
+        "env": {
+          "MINIFLUX_URL": "https://your-miniflux-instance.com",
+          "MINIFLUX_API_KEY": "your_api_key_here"
+        }
+      }
+    }
+  }
+}
+```
+
+Or register and verify it from the CLI:
+
+```bash
+openclaw mcp add miniflux \
+  --command docker \
+  --arg run \
+  --arg -i \
+  --arg --rm \
+  --arg --name --arg miniflux-mcp \
+  --arg -e --arg MINIFLUX_URL \
+  --arg -e --arg MINIFLUX_API_KEY \
+  --arg letttgaco/miniflux-mcp:latest \
+  --env MINIFLUX_URL=https://your-miniflux-instance.com \
+  --env MINIFLUX_API_KEY=your_api_key_here
+
+# Prove the server starts and exposes tools
+openclaw mcp doctor miniflux --probe
+```
+
+### Integration with Hermes Agent
+
+Hermes Agent reads MCP servers from `~/.hermes/config.yaml` under `mcp_servers`. Add the following:
+
+```yaml
+mcp_servers:
+  miniflux:
+    command: "docker"
+    args:
+      - "run"
+      - "-i"
+      - "--rm"
+      - "--name"
+      - "miniflux-mcp"
+      - "-e"
+      - "MINIFLUX_URL"
+      - "-e"
+      - "MINIFLUX_API_KEY"
+      - "letttgaco/miniflux-mcp:latest"
+    env:
+      MINIFLUX_URL: "https://your-miniflux-instance.com"
+      MINIFLUX_API_KEY: "your_api_key_here"
+      # Or use username/password instead of API key
+      # MINIFLUX_USERNAME: "your_username_here"
+      # MINIFLUX_PASSWORD: "your_password_here"
+```
+
+Then start Hermes (`hermes chat`) and reload MCP config with `/reload-mcp` if needed.
 
 ## Available Tools
 
