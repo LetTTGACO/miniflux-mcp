@@ -120,7 +120,7 @@ The Miniflux MCP Server provides **51 tools** across **7 groups**. The registere
 
 ### Entry Management (10 tools)
 - `get_entries` - Get entries with optional filters for status, multiple statuses, feed, category, pagination, sorting, starred state, timestamps, entry IDs, search, and global visibility
-- `get_daily_digest` - Get a bounded, digest-ready entry set since a caller-provided timestamp
+- `get_daily_digest` - Get a bounded, digest-ready entry set since a caller-provided timestamp with optional feed, category include, and category exclude filters
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
 - `update_entries_status` - Update multiple entry statuses (read/unread/removed) in one request
@@ -179,7 +179,9 @@ Arguments:
 - `status` defaults to `unread`; accepted values are `read`, `unread`, and `removed`.
 - `date_field` chooses `published` or `changed` for the time filter.
 - `limit` bounds the number of returned entries.
-- `feed_id` and `category_id` optionally scope the digest.
+- `feed_id` optionally scopes the digest to one feed.
+- `category_ids` optionally scopes the digest to multiple categories.
+- `exclude_category_ids` removes categories from the digest after `category_ids` is applied. When both are present, the effective category set is `category_ids - exclude_category_ids`.
 - `content_mode` controls content loading: `none`, `feed`, `scrape_when_short`, or `scrape_all`.
 - `min_content_length` controls when `scrape_when_short` attempts original-content scraping.
 - `max_content_length` truncates returned content per entry.
