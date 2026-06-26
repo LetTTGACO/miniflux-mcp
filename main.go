@@ -269,9 +269,6 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 	if feedID, ok := numberArg(argsMap, "feed_id"); ok {
 		filter.FeedID = int64(feedID)
 	}
-	if categoryID, ok := numberArg(argsMap, "category_id"); ok {
-		filter.CategoryID = int64(categoryID)
-	}
 
 	entries, err := s.client.Entries(filter)
 	if err != nil {
@@ -304,14 +301,16 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 }
 
 type dailyDigestOptions struct {
-	now              time.Time
-	since            int64
-	status           string
-	dateField        string
-	limit            int
-	contentMode      string
-	minContentLength int
-	maxContentLength int
+	now                time.Time
+	since              int64
+	status             string
+	dateField          string
+	limit              int
+	categoryIDs        []int64
+	excludeCategoryIDs []int64
+	contentMode        string
+	minContentLength   int
+	maxContentLength   int
 }
 
 func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, error) {
@@ -349,6 +348,17 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	if limit, ok := numberArg(args, "limit"); ok {
 		options.limit = int(limit)
 	}
+	categoryIDs, err := numberArrayArg(args, "category_ids")
+	if err != nil {
+		return options, err
+	}
+	options.categoryIDs = categoryIDs
+
+	excludeCategoryIDs, err := numberArrayArg(args, "exclude_category_ids")
+	if err != nil {
+		return options, err
+	}
+	options.excludeCategoryIDs = excludeCategoryIDs
 	if contentMode, ok := args["content_mode"].(string); ok && contentMode != "" {
 		switch contentMode {
 		case "none", "feed", "scrape_when_short", "scrape_all":
@@ -444,6 +454,29 @@ func truncateContent(content string, maxLength int) (string, bool) {
 func numberArg(args map[string]interface{}, key string) (float64, bool) {
 	value, ok := args[key].(float64)
 	return value, ok
+}
+
+func numberArrayArg(args map[string]interface{}, key string) ([]int64, error) {
+	value, ok := args[key]
+	if !ok || value == nil {
+		return nil, nil
+	}
+
+	values, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("%s must be an array of numbers", key)
+	}
+
+	result := make([]int64, 0, len(values))
+	for _, item := range values {
+		number, ok := item.(float64)
+		if !ok {
+			return nil, fmt.Errorf("%s must be an array of numbers", key)
+		}
+		result = append(result, int64(number))
+	}
+
+	return result, nil
 }
 
 // buildScopedEntryFilter removes the path-scoped ID before passing the remaining

@@ -462,9 +462,15 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 							"type":        "number",
 							"description": "Optional feed ID filter",
 						},
-						"category_id": map[string]interface{}{
-							"type":        "number",
-							"description": "Optional category ID filter",
+						"category_ids": map[string]interface{}{
+							"type":        "array",
+							"description": "Optional category IDs to include before exclusions are applied",
+							"items":       map[string]interface{}{"type": "number"},
+						},
+						"exclude_category_ids": map[string]interface{}{
+							"type":        "array",
+							"description": "Optional category IDs to exclude from the digest",
+							"items":       map[string]interface{}{"type": "number"},
 						},
 						"content_mode": map[string]interface{}{
 							"type":        "string",
