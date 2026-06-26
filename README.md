@@ -181,7 +181,7 @@ Arguments:
 - `limit` bounds the number of returned entries.
 - `feed_id` optionally scopes the digest to one feed.
 - `category_ids` optionally scopes the digest to multiple categories.
-- `exclude_category_ids` removes categories from the digest after `category_ids` is applied. When both are present, the effective category set is `category_ids - exclude_category_ids`.
+- `exclude_category_ids` removes categories from the digest after `category_ids` is applied. If `category_ids` is omitted or empty, the digest starts from all categories before applying `exclude_category_ids`. When both are present, the effective category set is `category_ids - exclude_category_ids`.
 - `content_mode` controls content loading: `none`, `feed`, `scrape_when_short`, or `scrape_all`.
 - `min_content_length` controls when `scrape_when_short` attempts original-content scraping.
 - `max_content_length` truncates returned content per entry.
