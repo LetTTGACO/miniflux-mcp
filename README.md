@@ -43,8 +43,13 @@ docker run --env-file .env miniflux-mcp
 ```bash
 # Setup .env file
 # Run
-docker run -i --rm --name miniflux-mcp --env-file .env letttgaco/miniflux-mcp:latest
+docker run -i --rm --env-file .env letttgaco/miniflux-mcp:latest
 ```
+
+For stdio MCP clients that start a fresh container on each connection, avoid a fixed
+`--name`. Docker only applies `--rm` after a successfully created container exits;
+an already-running or stopped container with the same name will block the next
+connection before `--rm` can clean anything up.
 
 ### Docker Hub Release Workflow
 
@@ -82,8 +87,6 @@ To use this MCP server with Claude Desktop, add the following to your Claude Des
         "run",
         "-i",
         "--rm",
-        "--name",
-        "miniflux-mcp",
         "-e",
         "MINIFLUX_URL",
         "-e",
@@ -108,7 +111,7 @@ Or register it with the Claude Code CLI (`--transport stdio` is the default and 
 claude mcp add miniflux \
   -e MINIFLUX_URL=https://your-miniflux-instance.com \
   -e MINIFLUX_API_KEY=your_api_key_here \
-  -- docker run -i --rm --name miniflux-mcp letttgaco/miniflux-mcp:latest
+  -- docker run -i --rm letttgaco/miniflux-mcp:latest
 ```
 
 Add `-s user` to register at user scope (available across all your projects) instead of the default local scope.
@@ -124,8 +127,6 @@ args = [
   "run",
   "-i",
   "--rm",
-  "--name",
-  "miniflux-mcp",
   "-e",
   "MINIFLUX_URL",
   "-e",
@@ -155,8 +156,6 @@ OpenClaw manages outbound MCP servers under `mcp.servers` in its config file (fo
           "run",
           "-i",
           "--rm",
-          "--name",
-          "miniflux-mcp",
           "-e",
           "MINIFLUX_URL",
           "-e",
@@ -181,7 +180,6 @@ openclaw mcp add miniflux \
   --arg run \
   --arg -i \
   --arg --rm \
-  --arg --name --arg miniflux-mcp \
   --arg -e --arg MINIFLUX_URL \
   --arg -e --arg MINIFLUX_API_KEY \
   --arg letttgaco/miniflux-mcp:latest \
@@ -204,8 +202,6 @@ mcp_servers:
       - "run"
       - "-i"
       - "--rm"
-      - "--name"
-      - "miniflux-mcp"
       - "-e"
       - "MINIFLUX_URL"
       - "-e"
