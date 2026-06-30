@@ -14,7 +14,7 @@
 
 - Keep changes focused on the MCP server, tool schemas, request builders, handlers, tests, and README.
 - When adding or expanding a tool, update all relevant places: schema in `tools.go`, handler/request building code, tests, and README.
-- `get_daily_digest` must require a caller-provided `since` value.
+- `get_daily_digest` may use a caller-provided `since` value when a bounded window is needed.
 - Keep digest content modes limited to `none`, `feed`, `scrape_when_short`, and `scrape_all`.
 - Do not add article cleanup, summarization, push delivery, or delivery logs.
 - Replace `category_id` with `category_ids`; backward compatibility for `category_id` is not required.

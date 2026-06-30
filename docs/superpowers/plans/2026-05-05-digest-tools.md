@@ -33,7 +33,7 @@
 - Modify: `main_test.go`
 - Modify: `README.md`
 
-- [x] Add failing tests for `get_daily_digest`: required `since`, unread default status, `published_after` based on caller input, and structured response.
+- [x] Add failing tests for `get_daily_digest`: optional `since`, unread default status, `published_after` based on caller input when present, and structured response.
 - [x] Add failing tests for `content_mode` values, explicit scrape behavior, returned Miniflux content, and truncation metadata.
 - [x] Add the tool schema with `since`, `status`, `date_field`, `limit`, `content_mode`, `min_content_length`, and `max_content_length`.
 - [x] Implement digest request building and response shaping.

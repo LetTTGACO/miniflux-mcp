@@ -237,7 +237,7 @@ The Miniflux MCP Server provides **51 tools** across **7 groups**. The registere
 
 ### Entry Management (10 tools)
 - `get_entries` - Get entries with optional filters for status, multiple statuses, feed, category, pagination, sorting, starred state, timestamps, entry IDs, search, and global visibility
-- `get_daily_digest` - Get a bounded, digest-ready entry set since a caller-provided timestamp with optional feed, category include, and category exclude filters
+- `get_daily_digest` - Get unread or time-bounded digest-ready entries with optional feed, category include, and category exclude filters
 - `get_entry` - Get a specific entry by ID
 - `update_entry_status` - Update entry status (read/unread/removed)
 - `update_entries_status` - Update multiple entry statuses (read/unread/removed) in one request
@@ -288,14 +288,14 @@ The Miniflux MCP Server provides **51 tools** across **7 groups**. The registere
 
 ## AI Digest Workflow
 
-Use `get_daily_digest` when an AI client needs bounded Miniflux input for a daily report or similar digest. The caller must pass `since` as a Unix timestamp or RFC3339 timestamp; the caller owns timezone and date-boundary decisions.
+Use `get_daily_digest` when an AI client needs Miniflux input for a daily report or similar digest. By default it fetches unread entries without a time filter, which works well when the client marks `ack_entry_ids` as read only after successful downstream processing. Callers may pass `since` as a Unix timestamp or RFC3339 timestamp to add a bounded digest window; the caller owns timezone and date-boundary decisions.
 
 Arguments:
 
-- `since` is required and accepts a Unix timestamp or RFC3339 timestamp.
+- `since` is optional and accepts a Unix timestamp or RFC3339 timestamp. When omitted, no time filter is applied.
 - `status` defaults to `unread`; accepted values are `read`, `unread`, and `removed`.
-- `date_field` chooses `published` or `changed` for the time filter.
-- `limit` bounds the number of returned entries.
+- `date_field` chooses `published` or `changed` for the time filter when `since` is provided, and also controls the default sort field.
+- `limit` bounds the number of returned entries. When omitted, `get_daily_digest` fetches all unread entries if `since` is omitted, or 50 entries if `since` is provided.
 - `feed_id` optionally scopes the digest to one feed.
 - `category_ids` optionally scopes the digest to multiple categories.
 - `exclude_category_ids` removes categories from the digest after `category_ids` is applied. If `category_ids` is omitted or empty, the digest starts from all categories before applying `exclude_category_ids`. When both are present, the effective category set is `category_ids - exclude_category_ids`.
@@ -305,7 +305,7 @@ Arguments:
 
 Recommended flow:
 
-1. The AI client decides the digest window and calls `get_daily_digest` with `since` and an optional bounded `limit`.
+1. The AI client calls `get_daily_digest` with the default unread queue, or passes `since` when it needs an explicit time window.
 2. The AI client summarizes, displays, or pushes the returned entries.
 3. After successful delivery or review, the AI client may call `update_entries_status` with `ack_entry_ids` from the digest response and `status: "read"`.
 

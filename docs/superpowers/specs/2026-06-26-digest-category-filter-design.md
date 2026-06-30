@@ -28,7 +28,7 @@ For example, `category_ids: [1, 2, 4]` and `exclude_category_ids: [4]` returns o
 
 ## Implementation
 
-The pinned Miniflux Go client exposes a single `CategoryID` filter for entry queries, not a multiple-category or negative-category filter. To avoid missing entries, `get_daily_digest` will query entries using the existing time, status, feed, limit, and ordering filters, then apply include/exclude category filtering inside the MCP server before building digest entries and acknowledgement IDs.
+The pinned Miniflux Go client exposes a single `CategoryID` filter for entry queries, not a multiple-category or negative-category filter. To avoid missing entries, `get_daily_digest` will query entries using the existing optional time, status, feed, limit, and ordering filters, then apply include/exclude category filtering inside the MCP server before building digest entries and acknowledgement IDs.
 
 The response `count` and `ack_entry_ids` will reflect entries remaining after category filtering. The response `total` will continue to report the Miniflux API total for the upstream query because the API returns that value before local filtering.
 

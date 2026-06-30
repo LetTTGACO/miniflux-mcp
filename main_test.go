@@ -180,7 +180,6 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"get_feed_icon":          {"feed_id"},
 		"mark_feed_as_read":      {"feed_id"},
 		"get_entry":              {"entry_id"},
-		"get_daily_digest":       {"since"},
 		"update_entry_status":    {"entry_id", "status"},
 		"update_entries_status":  {"entry_ids", "status"},
 		"toggle_starred":         {"entry_id"},
@@ -228,6 +227,7 @@ func TestToolDefinitionsExposeExpectedRequiredArguments(t *testing.T) {
 		"get_feeds",
 		"refresh_all_feeds",
 		"get_entries",
+		"get_daily_digest",
 		"get_categories",
 		"get_users",
 		"get_me",
@@ -407,16 +407,100 @@ func TestGetDailyDigestScrapesOnlyWhenExplicitlyRequestedAndTruncates(t *testing
 	}
 }
 
-func TestGetDailyDigestRequiresSince(t *testing.T) {
-	server := &MinifluxServer{}
+func TestGetDailyDigestWithoutSinceFetchesUnreadWithoutTimeFilter(t *testing.T) {
+	requests := make([]*http.Request, 0, 1)
+	server := &MinifluxServer{
+		client: client.NewClientWithOptions(
+			"http://mf",
+			client.WithHTTPClient(&http.Client{
+				Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+					requests = append(requests, req)
+					if req.Method != http.MethodGet {
+						t.Fatalf("method = %s, want GET", req.Method)
+					}
+					if req.URL.Path != "/v1/entries" {
+						t.Fatalf("path = %s, want /v1/entries", req.URL.Path)
+					}
+					if got := req.URL.Query().Get("category_id"); got != "" {
+						t.Fatalf("category_id query = %q, want empty because filtering is local", got)
+					}
+
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"total": 3,
+							"entries": [
+								{
+									"id": 42,
+									"title": "Late import",
+									"url": "https://example.com/late",
+									"status": "unread",
+									"content": "<p>This unread entry was fetched without a time window.</p>",
+									"feed_id": 7,
+									"feed": {"id": 7, "title": "Example Feed", "category": {"id": 3, "title": "News"}}
+								},
+								{
+									"id": 43,
+									"title": "Excluded import",
+									"url": "https://example.com/excluded",
+									"status": "unread",
+									"feed_id": 8,
+									"feed": {"id": 8, "title": "Excluded Feed", "category": {"id": 5, "title": "Social"}}
+								},
+								{
+									"id": 44,
+									"title": "Outside include",
+									"url": "https://example.com/outside",
+									"status": "unread",
+									"feed_id": 9,
+									"feed": {"id": 9, "title": "Outside Feed", "category": {"id": 9, "title": "Other"}}
+								}
+							]
+						}`)),
+						Header: http.Header{},
+					}, nil
+				}),
+			}),
+		),
+	}
 
 	result, err := server.GetDailyDigest(context.Background(), mcp.CallToolRequest{
-		Params: mcp.CallToolParams{Arguments: map[string]interface{}{}},
+		Params: mcp.CallToolParams{Arguments: map[string]interface{}{
+			"category_ids":         []interface{}{float64(3), float64(5)},
+			"exclude_category_ids": []interface{}{float64(5)},
+		}},
 	})
 	if err != nil {
 		t.Fatalf("handler returned transport error: %v", err)
 	}
-	assertToolErrorContains(t, result, "since is required")
+	if result == nil || result.IsError {
+		t.Fatalf("result = %#v, want non-error", result)
+	}
+	if len(requests) != 1 {
+		t.Fatalf("requests = %d, want 1", len(requests))
+	}
+
+	query := requests[0].URL.Query()
+	if got := query.Get("status"); got != "unread" {
+		t.Fatalf("status query = %q, want unread", got)
+	}
+	for _, param := range []string{"published_after", "changed_after"} {
+		if got := query.Get(param); got != "" {
+			t.Fatalf("%s query = %q, want empty", param, got)
+		}
+	}
+	if got := query.Get("order"); got != "published_at" {
+		t.Fatalf("order query = %q, want published_at", got)
+	}
+	if got := query.Get("limit"); got != "0" {
+		t.Fatalf("limit query = %q, want 0 for all unread entries", got)
+	}
+
+	var response dailyDigestResponse
+	unmarshalToolResultText(t, result, &response)
+	if response.Count != 1 || len(response.AckEntryIDs) != 1 || response.AckEntryIDs[0] != 42 {
+		t.Fatalf("response count/ack ids = %d/%#v, want 1/[42]", response.Count, response.AckEntryIDs)
+	}
 }
 
 func TestGetDailyDigestCategoryFilterSchema(t *testing.T) {

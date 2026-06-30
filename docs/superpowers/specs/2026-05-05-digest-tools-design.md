@@ -2,11 +2,11 @@
 
 ## Goal
 
-Add two high-level MCP tools for AI clients: one to fetch Miniflux entries for a caller-defined digest window, and one to update many entry statuses after a successful downstream action.
+Add two high-level MCP tools for AI clients: one to fetch Miniflux entries for digest processing, and one to update many entry statuses after a successful downstream action.
 
 ## Tool Scope
 
-`get_daily_digest` returns entries published since a caller-provided `since` timestamp. It defaults to unread entries so articles read in the Miniflux web UI are not returned again unless the caller chooses another status. The MCP server does not choose a timezone or daily boundary.
+`get_daily_digest` defaults to unread entries without a time filter, so it can act as a queue for AI digest processing. Callers may provide a `since` timestamp to add a bounded digest window using `date_field`; the MCP server does not choose a timezone or daily boundary.
 
 `update_entries_status` accepts `entry_ids` and a Miniflux status (`read`, `unread`, or `removed`) and updates them in one Miniflux API call. The AI client should call this only after its own delivery, review, or processing step succeeds.
 
@@ -27,4 +27,4 @@ The MCP server does not summarize news, decide timezones, calculate daily bounda
 
 ## Verification
 
-Tests should cover tool registration, required `since` filtering, content modes, explicit scrape behavior, truncation metadata, and batch status request bodies. README tool counts and tool lists must stay aligned with registered tools.
+Tests should cover tool registration, optional `since` filtering, unread defaults, content modes, explicit scrape behavior, truncation metadata, and batch status request bodies. README tool counts and tool lists must stay aligned with registered tools.
