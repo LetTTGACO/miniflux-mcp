@@ -437,12 +437,12 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 		{
 			Tool: mcp.Tool{
 				Name:        "get_daily_digest",
-				Description: "Get entries since a caller-provided timestamp with digest-ready metadata and content",
+				Description: "Get unread or time-bounded entries with digest-ready metadata and content",
 				InputSchema: mcp.ToolInputSchema{
 					Type: "object",
 					Properties: map[string]interface{}{
 						"since": map[string]interface{}{
-							"description": "Unix timestamp or RFC3339 timestamp for the start of the digest window",
+							"description": "Optional Unix timestamp or RFC3339 timestamp for the start of the digest window",
 						},
 						"status": map[string]interface{}{
 							"type":        "string",
@@ -456,7 +456,7 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 						},
 						"limit": map[string]interface{}{
 							"type":        "number",
-							"description": "Maximum number of entries to fetch (default: 50)",
+							"description": "Maximum number of entries to fetch (default: all unread when since is omitted; 50 when since is provided)",
 						},
 						"feed_id": map[string]interface{}{
 							"type":        "number",
@@ -486,7 +486,6 @@ func minifluxToolDefinitions(s *MinifluxServer) []ToolDefinition {
 							"description": "Maximum content length per entry (default: 6000)",
 						},
 					},
-					Required: []string{"since"},
 				},
 			},
 			Handler: s.GetDailyDigest,

@@ -237,8 +237,8 @@ func buildEntryFilter(args map[string]interface{}) *client.Filter {
 }
 
 // GetDailyDigest builds a bounded, summarizer-friendly entry list. Unlike
-// get_entries, it requires the caller to provide the time window explicitly so
-// scheduled agents do not accidentally reprocess an unbounded backlog.
+// get_entries, it defaults to unread entries and lets callers optionally add a
+// time window when they need one.
 func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	argsMap := map[string]interface{}{}
 	if request.Params.Arguments != nil {
@@ -261,10 +261,14 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 		Direction: "desc",
 	}
 	if options.dateField == "changed" {
-		filter.ChangedAfter = options.since
 		filter.Order = "changed_at"
-	} else {
-		filter.PublishedAfter = options.since
+	}
+	if options.hasSince {
+		if options.dateField == "changed" {
+			filter.ChangedAfter = options.since
+		} else {
+			filter.PublishedAfter = options.since
+		}
 	}
 	if feedID, ok := numberArg(argsMap, "feed_id"); ok {
 		filter.FeedID = int64(feedID)
@@ -307,6 +311,7 @@ func (s *MinifluxServer) GetDailyDigest(ctx context.Context, request mcp.CallToo
 type dailyDigestOptions struct {
 	now                time.Time
 	since              int64
+	hasSince           bool
 	status             string
 	dateField          string
 	limit              int
@@ -321,7 +326,6 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	options := dailyDigestOptions{
 		status:           "unread",
 		dateField:        "published",
-		limit:            50,
 		contentMode:      "feed",
 		minContentLength: 500,
 		maxContentLength: 6000,
@@ -330,14 +334,14 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 
 	if since, ok := numberArg(args, "since"); ok {
 		options.since = int64(since)
+		options.hasSince = true
 	} else if sinceString, ok := args["since"].(string); ok && sinceString != "" {
 		since, err := time.Parse(time.RFC3339, sinceString)
 		if err != nil {
 			return options, fmt.Errorf("since must be a Unix timestamp or RFC3339 timestamp")
 		}
 		options.since = since.Unix()
-	} else {
-		return options, fmt.Errorf("since is required")
+		options.hasSince = true
 	}
 
 	if status, ok := args["status"].(string); ok && status != "" {
@@ -351,6 +355,8 @@ func buildDailyDigestOptions(args map[string]interface{}) (dailyDigestOptions, e
 	}
 	if limit, ok := numberArg(args, "limit"); ok {
 		options.limit = int(limit)
+	} else if options.hasSince {
+		options.limit = 50
 	}
 	categoryIDs, err := numberArrayArg(args, "category_ids")
 	if err != nil {
